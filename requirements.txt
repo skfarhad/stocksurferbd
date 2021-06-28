@@ -1,0 +1,13 @@
+selenium
+requests
+bs4
+pandas
+jupyter
+scipy
+sklearn
+numpy
+matplotlib
+statsmodels==0.12.0
+scikit-learn==0.23.2
+tensorflow==2.3.1
+mplfinance
