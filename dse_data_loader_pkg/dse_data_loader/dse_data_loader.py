@@ -11,6 +11,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 import datetime
+from dateutil import parser
+import urllib.parse as parse_url
 
 
 class PriceData(object):
@@ -60,27 +62,40 @@ class PriceData(object):
         for row in table_rows:
             row_data = ["".join(td.get_text().split()) for td in row.find_all("td")]
             try:
-                dict_list.append(
-                    {
-                        'DATE': row_data[1],
-                        'TRADING_CODE': row_data[2],
-                        'LTP': self.parse_float(row_data[3]),
-                        'HIGH': self.parse_float(row_data[4]),
-                        'LOW': self.parse_float(row_data[5]),
-                        'OPENP': self.parse_float(row_data[6]),
-                        'CLOSEP': self.parse_float(row_data[7]),
-                        'YCP': self.parse_float(row_data[8]),
-                        'TRADE': self.parse_float(row_data[9].replace(',', '')),
-                        'VALUE_MN': self.parse_float(row_data[10]),
-                        'VOLUME': self.parse_float(row_data[11].replace(',', '')),
-                    }
-                )
+                dict_list.append({
+                    'DATE': row_data[1],
+                    'TRADING_CODE': row_data[2],
+                    'LTP': self.parse_float(row_data[3]),
+                    'HIGH': self.parse_float(row_data[4]),
+                    'LOW': self.parse_float(row_data[5]),
+                    'OPENP': self.parse_float(row_data[6]),
+                    'CLOSEP': self.parse_float(row_data[7]),
+                    'YCP': self.parse_float(row_data[8]),
+                    'TRADE': self.parse_float(row_data[9].replace(',', '')),
+                    'VALUE_MN': self.parse_float(row_data[10]),
+                    'VOLUME': self.parse_float(row_data[11].replace(',', '')),
+                })
             except Exception as e:
                 print(str(e))
         return dict_list
 
     def parse_current_data_rows(self, soup):
         dict_list = []
+        table_header = soup.find(
+            'h2',
+            attrs={
+                'class': "BodyHead topBodyHead"
+            }
+        )
+        # print(table_header)
+        date_txt = " ".join(table_header.text.split(
+            'On'
+        )[1].split(
+            'at'
+        )[0].strip().split(
+
+        ))
+        latest_trading_date = parser.parse(date_txt).date()
         stock_table = soup.find(
             "table",
             attrs={
@@ -96,24 +111,23 @@ class PriceData(object):
                 # print(th_values)
                 continue
             # print(td_values)
-            dict_list.append(
-                {
-                    'TRADING_CODE': td_values[1],
-                    'LTP': self.parse_float(td_values[2]),
-                    'HIGH': self.parse_float(td_values[3]),
-                    'LOW': self.parse_float(td_values[4]),
-                    'CLOSEP': self.parse_float(td_values[5]),
-                    'YCP': self.parse_float(td_values[6]),
-                    '% CHANGE': self.parse_float(td_values[7]),
-                    'TRADE': self.parse_float(td_values[8]),
-                    'VALUE_MN': self.parse_float(td_values[9]),
-                    'VOLUME': self.parse_float(td_values[10]),
-                }
-            )
+            dict_list.append({
+                'DATE': latest_trading_date,
+                'TRADING_CODE': td_values[1],
+                'LTP': self.parse_float(td_values[2]),
+                'HIGH': self.parse_float(td_values[3]),
+                'LOW': self.parse_float(td_values[4]),
+                'CLOSEP': self.parse_float(td_values[5]),
+                'YCP': self.parse_float(td_values[6]),
+                '% CHANGE': self.parse_float(td_values[7]),
+                'TRADE': self.parse_float(td_values[8]),
+                'VALUE_MN': self.parse_float(td_values[9]),
+                'VOLUME': self.parse_float(td_values[10]),
+            })
         return dict_list
 
     def save_history_csv(self, symbol, csv_path='', file_name='history_data.csv'):
-        full_url = self.get_history_url() + "&inst=" + symbol
+        full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
         target_page = requests.get(full_url)
         bs_data = BeautifulSoup(target_page.text, 'html.parser')
         history_list = self. parse_historical_data_rows(bs_data)

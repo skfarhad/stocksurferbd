@@ -1,7 +1,12 @@
+#!/usr/bin/env python
+
+__author__ = "Sk Farhad"
+__copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
+
 import os
 import pandas as pd
 
-from dse_data_loader import PriceData
+from dse_data_loader_pkg import PriceData
 
 
 CUR_FILE_NAME = 'dsebd_current_data.csv'
@@ -11,8 +16,8 @@ HISTORY_FOLDER = 'dse_history_data'
 loader = PriceData()
 
 
-def append_historical_data(symbol, df_cur):
-    csv_path = os.path.join(HISTORY_FOLDER, symbol + "_stock_data.csv")
+def append_historical_data(symbol, df_cur, csv_path=''):
+    csv_path = os.path.join(csv_path, symbol + "_history_data.csv")
     df_history = pd.read_csv(
         csv_path,
         sep=r'\s*,\s*',
@@ -22,11 +27,12 @@ def append_historical_data(symbol, df_cur):
     )
     dates = df_history['DATE'].values
     # print(df_history.head())
-    if loader.get_date() not in dates:
+    latest_date = df_cur[df_cur['TRADING_CODE'] == symbol]['DATE'].values[0]
+    if latest_date not in dates:
         cur_row = df_cur[df_cur['TRADING_CODE'] == symbol]
         df_history = df_history.append(
             {
-                'DATE': loader.get_date(),
+                'DATE': latest_date,
                 'TRADING_CODE': symbol,
                 'LTP': cur_row['LTP'].values[0],
                 'HIGH': cur_row['HIGH'].values[0],
@@ -69,13 +75,14 @@ def append_all_stock_data():
     for sym in symbols:
         print('Appending ' + sym + " data.....")
         try:
-            append_historical_data(sym, df_cur)
+            append_historical_data(sym, df_cur, csv_path=HISTORY_FOLDER)
             print('Appending ' + sym + " Finished!")
         except Exception as e:
             print(sym + " ERROR: " + str(e))
     print('Data extraction finished')
 
 
-# fetch_all_stock_data()
+fetch_all_stock_data()
 # append_all_stock_data()
-loader.save_history_csv('ACI', file_name='ACI.csv')
+# loader.save_history_csv('KAY&QUE', file_name='KAY&QUE.csv')
+# loader.save_current_csv()

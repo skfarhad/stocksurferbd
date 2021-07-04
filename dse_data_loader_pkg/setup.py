@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="dse-data-loader",
-    version="0.0.1",
+    version="0.0.2",
     author="Sk Farhad",
     author_email="sk.farhad.eee@gmail.com",
-    description="This is a tool to download stock price data of Dhaka Stock Exchange.",
+    description="This is a tool to download stock market data of Dhaka Stock Exchange.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/skfarhad/algo-trading/tree/master/dse_data_loader",
+    url="https://github.com/skfarhad/algo-trading/tree/master/dse_data_loader_pkg",
     project_urls={
         "Bug Tracker": "https://github.com/skfarhad/algo-trading/issues",
     },

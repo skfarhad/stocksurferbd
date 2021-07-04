@@ -9,7 +9,7 @@ pip install dse-data-loader
 ```
 ##Usage
 
-Downloading fundamental data-
+Downloading fundamental data of a company-
 
 ```
 from dse_data_loader import FundamentalData
@@ -22,7 +22,7 @@ The above code will crete two files named 'company_data.csv' & 'financial_data.c
 The file named company_data.csv contains the fundamental data for current year
 financial_data.csv contains year wise fundmental data according to [DSE website](http://dsebd.org).
 
-Downloading history price data-
+Downloading historical price data of a stock-
 
 ```
 from dse_data_loader import PriceData
@@ -35,7 +35,7 @@ The above code will create a file named- 'ACI_history.csv'.
 It'll contain historical price data for ACI Limited. 'ACI' is the stock symbol.
 
 
-Downloading current price data for all symbols-
+Downloading current price data for all stocks-
 ```
 from dse_data_loader import PriceData
 loader = PriceData()
