@@ -18,3 +18,4 @@ env/
 __pycache__/
 ta-lib/
 company_info/
+dse_history_data/

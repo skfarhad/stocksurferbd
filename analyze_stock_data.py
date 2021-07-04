@@ -1,18 +1,18 @@
-import math
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-from model_utils.arima_utils import TSxARIMA
-import time
-import tensorflow as tf
-
 import mplfinance as mplf
+from matplotlib.ticker import MultipleLocator
 from scipy import stats
 import talib as ta
+from pyti.bollinger_bands import upper_bollinger_band as bb_up
+from pyti.bollinger_bands import middle_bollinger_band as bb_mid
+from pyti.bollinger_bands import lower_bollinger_band as bb_low
+from tapy import Indicators
 
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-tf.get_logger().setLevel('ERROR')
+
+RISK_R = 32
+HISTORY_FOLDER = 'dse_history_data'
 
 
 def clean_x(x):
@@ -54,18 +54,23 @@ def process_data_mpl(file_path='', data_len=720, train_len=40):
         engine='python',
     )
     # print(df.head())
-    columns = ['DATE', 'CLOSEP', 'VOLUME', 'HIGH', 'LOW', 'OPENP']
+    columns = ['DATE', 'CLOSEP', 'VALUE_MN', 'HIGH', 'LOW', 'OPENP', 'TRADE']
     df = df[columns]
     df = df.rename(columns={
         'DATE': 'Date',
         'OPENP': 'Open',
         'CLOSEP': 'Close',
-        'VOLUME': 'Volume',
+        'VALUE_MN': 'Volume',
+        'TRADE': 'Trade',
         'HIGH': 'High',
         'LOW': 'Low'
     }, inplace=False)
 
-    df['Volume'] = df.apply(lambda row: row['Volume']/1000, axis=1)
+    df = df[df['Open'] > 0]
+    df = df[df['High'] > 0]
+    df = df[df['Close'] > 0]
+
+    # df['Volume'] = df.apply(lambda row: row['Volume'], axis=1)
     df['Date'] = pd.to_datetime(df['Date'])
     df.sort_values(by='Date', inplace=True)
     df.reset_index(inplace=True)
@@ -73,126 +78,220 @@ def process_data_mpl(file_path='', data_len=720, train_len=40):
     return df
 
 
-def plot_stock_data(symbol, data):
-    print('Symbol: ', symbol)
-    close_p = data['CLOSEP']
-    mu_close_p, std_close_p = round(close_p.mean(), 2), round(close_p.std(), 2)
-    # print("CLOSEP(mu, sigma):", mu_close_p, std_close_p)
-    volume = data['VALUE_MN']
-    mu_volume_p, std_volume_p = round(volume.mean(), 2), round(volume.std(), 2)
-    # print("VOLUME(mu, sigma):", mu_volume_p, std_volume_p)
-    trade = data['TRADE']
-    mu_trade_p, std_trade_p = round(trade.mean(), 2), round(trade.std(), 2)
-    # print("TRADE(mu, sigma):", mu_trade_p, std_trade_p)
-    s_dates = data['DATE']
-    fig = plt.figure(figsize=(18, 7), dpi=80)
-    plt.plot(s_dates, close_p, '--o')
-    plt.bar(s_dates, trade)
-    plt.xticks(rotation=70)
-    plt.xlabel('Dates', fontsize=16)
-    plt.ylabel('Stock Price of ' + symbol, fontsize=16)
-    plt.grid()
-    plt.show()
-
-
-def visualize_data(symbols, data_n=360):
-    for symbol in symbols:
-        path = 'bd_stock_prices/' + symbol + '_stock_data.csv'
-        data = process_data(path)
-        data = data[-data_n:]
-        plot_stock_data(symbol, data)
-
-
 def candelstick_plot(symbol, data):
-    print('Symbol: ', symbol)
-
-    data["macd"], data["macd_signal"], data["macd_hist"] = ta.MACD(data['Close'])
+    ltp = data['Close'][-1:].values[0]
+    max_p = max(data['Close'][-RISK_R:].values)
+    gain = ((max_p - ltp)/ltp) * 100
+    min_p = min(data['Close'][-RISK_R:].values)
+    trade = data['Trade']
+    loss = ((ltp - min_p)/ltp)*100
+    print('-----------------------------------------------------')
+    print('Symbol: ' + symbol + ', LTP: ' + str(ltp) +
+        ', ' + str(RISK_R) + ' day % gain:loss- ' +
+        str(round(gain, 2)) + ":" + str(round(loss, 2))
+    )
+    macd, macd_signal, macd_hist = ta.MACD(data['Close'])
 
     # macd panel
-    colors = ['g' if v >= 0 else 'r' for v in data["macd_hist"]]
-    macd_plot = mplf.make_addplot(data["macd"], panel=1, color='orange', title="MACD")
-    macd_hist_plot = mplf.make_addplot(data["macd_hist"], type='bar', panel=1, color=colors)  # color='dimgray'
-    macd_signal_plot = mplf.make_addplot(data["macd_signal"], panel=1, color='blue')
+    color_up = 'limegreen'
+    color_down = 'tomato'
+
+    colors = [color_up if v >= 0 else color_down for v in macd_hist]
+    macd_plot = mplf.make_addplot(
+        macd, panel=1, color='orange', width=1, ylabel='MACD'
+    )
+    macd_hist_plot = mplf.make_addplot(macd_hist, type='bar', panel=1, color=colors)
+    macd_signal_plot = mplf.make_addplot(macd_signal, panel=1, color='blue', width=1)
+
+    data_cl = data['Close'].values.tolist()
+    ma1, ma2 = 5, 20
+    bb_u = bb_up(data_cl, ma2)
+    bb_l = bb_low(data_cl, ma2)
+    bb_m = bb_mid(data_cl, ma2)
+
+    bb_m_plot = mplf.make_addplot(bb_m, panel=0, color='cyan', width=1, alpha=0.5)
+    bb_l_plot = mplf.make_addplot(bb_l, panel=0, color='yellow', width=1, alpha=0.5)
+    bb_u_plot = mplf.make_addplot(bb_u, panel=0, color='yellow', width=1, alpha=0.5)
+
+    data_short = data['Close'][-RISK_R:]
+    data_n = len(data)
+    x_tr = range(0, len(data_short))
+    slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
+    y_tr_value = slope * x_tr + y_tr
+    y_tr_value = np.concatenate((
+        [np.NaN] * (data_n - RISK_R), y_tr_value
+    ))
+
+    data_long = data['Close'][: (data_n - RISK_R)]
+    x_tr2 = range(0, len(data_long))
+    slope2, y_tr2, r_val, p_val, std_err = stats.linregress(x_tr2, data_long)
+    y_tr_value2 = slope2 * x_tr2 + y_tr2
+    y_tr_value2 = np.concatenate((
+        y_tr_value2, [np.NaN] * RISK_R
+    ))
+
+    y_tr_plot = mplf.make_addplot(
+        y_tr_value, panel=0, color='coral', width=2, alpha=0.4, linestyle='dashed'
+    )
+    price_plot = mplf.make_addplot(data['Close'], panel=0, color='gray', width=1, alpha=0.5)
+
+    vol_colors = data.apply(lambda x: color_up if x['Close'] > x['Open'] else color_down, axis=1)
+    volume_plot = mplf.make_addplot(
+        data['Volume'], panel=2, color=vol_colors.values, type='bar', ylabel='Value(Mil)',
+    )
+    y_tr_plot2 = mplf.make_addplot(
+        y_tr_value2, panel=0, color='coral', width=2, alpha=0.4, linestyle='dashed'
+    )
+
+    # trade_plot = mplf.make_addplot(trade.values, panel=2, color='gray', type='bar')
+
+    # ind = Indicators(data)
+    # ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
+    # data = ind.df
+    # data['fr_high'] = data.apply(lambda x: x['Close'] if x['fr_high'] else 0, axis=1)
+    # data['fr_low'] = data.apply(lambda x: x['Close'] if x['fr_low'] else 0, axis=1)
+    #
+    # print(data[['Date','Close', 'fr_high', 'fr_low']])
+    #
+    # fr_high_plot = mplf.make_addplot(data['fr_high'], panel=0, color='gray', width=1, linestyle='dashed')
+    # fr_low_plot = mplf.make_addplot(data['fr_low'], panel=0, color='orange', width=1, linestyle='dashed')
 
     # plot
-    plots = [macd_plot, macd_signal_plot, macd_hist_plot]
-    mplf.plot(
-        data,
+    plots = [
+        price_plot,
+        macd_plot, macd_signal_plot, macd_hist_plot,
+        bb_u_plot, bb_m_plot, bb_l_plot,
+        y_tr_plot,
+        y_tr_plot2,
+        volume_plot,
+        # trade_plot,
+        # fr_low_plot,
+        # fr_high_plot
+    ]
+
+    custom_nc = mplf.make_mpf_style(
+        base_mpf_style='nightclouds',
+        marketcolors={'candle': {'up': color_up, 'down': color_down},
+                      'edge': {'up': color_up, 'down': color_down},
+                      'wick': {'up': color_up, 'down': color_down},
+                      'ohlc': {'up': color_up, 'down': color_down},
+                      'volume': {'up': color_up, 'down': color_down},
+                      'vcdopcod': True,  # Volume Color Depends On Price Change On Day
+                      'alpha': 1.0,
+                      },
+        mavcolors=['gray', 'sienna', 'darkslategray', 'purple'],
+    )
+
+    fig, axlist = mplf.plot(
+        data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']],
         type='candle',
-        style='nightclouds',
+        style=custom_nc,
         title='Chart for: ' + symbol,
         ylabel='Price (Tk)',
         figratio=(18, 7),
-        volume=True,
-        ylabel_lower='Volume(K)',
-        mav=(5, 20, 45),
         addplot=plots,
-        volume_panel=2,
+        # volume=True,
+        # volume_panel=2,
         scale_padding={'left': 1, 'top': 1, 'right': 1, 'bottom': 1},
         panel_ratios=(1, 0.3, .3),
         xrotation=7.5,
         # tight_layout=True,
-        # show_nontrading=True,
+        show_nontrading=True,
+        # returnfig=True
     )
+
+    axlist[0].xaxis.set_minor_locator(MultipleLocator(1))
 
 
 def visualize_candlestick_data(symbols, data_n=360):
     for symbol in symbols:
-        path = 'bd_stock_prices/' + symbol + '_stock_data.csv'
-        data = process_data_mpl(path)
-        data = data[data['Open'] > 0]
-        data = data[data['High'] > 0]
-        data = data[data['Close'] > 0]
-        data = data[-data_n:]
         try:
+            path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
+            data = process_data_mpl(path)
+            data = data[data['Open'] > 0]
+            data = data[data['High'] > 0]
+            data = data[data['Close'] > 0]
+            data = data[-data_n:]
             candelstick_plot(symbol, data)
         except Exception as e:
             print(str(e))
 
 
-def analyze_dse_data_subset(symbols, data_n=360):
-    path = 'bd_stock_prices'
-    df = pd.DataFrame(columns=[
-        'symbol',
-        'avg_close_p',
-        'std_close_p',
-        'cov_close_p',
-        'avg_trade',
-        'std_trade',
-        'avg_volume_mn',
-        'std_volume_mn',
-        'slope_close_p'
-    ])
+def get_crossing(y_val, kpi_data):
+    x_flag = None
+    x_count = 0
+    x_dist = 0
+
+    for y_i, kpi_i in zip(y_val, kpi_data):
+        x_dist += abs(y_i - kpi_i)
+        if x_flag is None:
+            x_flag = y_i > kpi_i
+        else:
+            c_flag = y_i > kpi_i
+            if c_flag != x_flag:
+                x_count += 1
+                x_flag = c_flag
+
+    x_dist_avg = x_dist / len(kpi_data)
+
+    return x_count, x_dist_avg
+
+
+def visualize_candlestick_data_single(symbol, data_n=360):
+    try:
+        path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
+        data = process_data_mpl(path)
+        data = data[-data_n:]
+        candelstick_plot(symbol, data)
+    except Exception as e:
+        print(str(e))
+
+
+def aggregate_history_data(symbols, data_n=90, n_short=RISK_R):
+    path = HISTORY_FOLDER
+    df = pd.DataFrame()
     for symbol in symbols:
-        full_path = os.path.join(path, symbol + '_stock_data.csv')
+        full_path = os.path.join(path, symbol + '_history_data.csv')
         try:
             data_df = process_data(full_path)
             data_df = data_df[-data_n:]
-            close_p = data_df['CLOSEP']
-            avg_close_p, std_close_p = round(close_p.mean(), 2), round(close_p.std(), 2)
-            volume = data_df['VALUE_MN']
-            avg_volume, std_volume = round(volume.mean(), 2), round(volume.std(), 2)
-            trade = data_df['TRADE']
-            avg_trade, std_trade = round(trade.mean(), 2), round(trade.std(), 2)
-            x_values = range(0, len(close_p))
-            slope, y_c, r_val, p_val, std_err = stats.linregress(x_values, close_p)
-            cov_close_p = std_close_p / avg_close_p
-            # print(symbol, avg_close_p, avg_trade, avg_volume)
+            n_long = (data_n - n_short)
+            close_l = data_df['CLOSEP'][0:n_long]
+            close_s = data_df['CLOSEP'][-n_short:]
+            ltp = data_df['CLOSEP'][-1:].values[0]
+
+            max_gain = ((max(close_s.values) - ltp) / ltp) * 100
+            max_loss = ((ltp - min(close_s.values)) / ltp) * 100
+
+            volume = data_df['VALUE_MN'][-n_short:]
+            avg_volume = round(volume.mean(), 2)
+            trade = data_df['TRADE'][-n_short:]
+            avg_trade = round(trade.mean(), 2)
+
+            x_l = range(0, n_long)
+            slope_l, y_l, r_val, p_val, std_err = stats.linregress(x_l, close_l)
+            # x_close, avg_x_dist = get_crossing(y_l, close_l.values)
+            x_s = range(0, n_short)
+            slope_s, y_s, r_val, p_val, std_err = stats.linregress(x_s, close_s)
             df = df.append(
                 {
                     'symbol': symbol,
-                    'avg_close_p': avg_close_p,
-                    'std_close_p': std_close_p,
-                    'cov_close_p': cov_close_p,
+                    'ltp': ltp,
+                    # 'x_close': x_close,
+                    # 'avg_x_dist': avg_x_dist,
+                    'max_gain': max_gain,
+                    'max_loss': max_loss,
                     'avg_trade': avg_trade,
-                    'std_trade': std_trade,
                     'avg_volume_mn': avg_volume,
-                    'std_volume_mn': std_volume,
-                    'slope_close_p': slope,
+                    'per_trade_k': (volume/trade).mean() * 1000,
+                    'slope_s': slope_s,
+                    'slope_l': slope_l,
                 },
                 ignore_index=True
             )
         except Exception as e:
             print(str(e))
+    # print(df.head())
     return df
+
 
