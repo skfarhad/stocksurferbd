@@ -76,6 +76,6 @@ def append_all_stock_data():
     print('Data extraction finished')
 
 
-fetch_all_stock_data()
+# fetch_all_stock_data()
 # append_all_stock_data()
-# loader.save_history_csv('ACI', file_name='ACI.csv')
+loader.save_history_csv('ACI', file_name='ACI.csv')

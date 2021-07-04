@@ -4,7 +4,6 @@ import os
 # from selenium import webdriver
 import pandas as pd
 from dse_data_loader import FundamentalData
-
 loader = FundamentalData()
 
 
@@ -18,4 +17,4 @@ def get_all_company_data():
 # df_company, df_fin = loader.get_company_df(['ACI'])
 # print(df_company.head())
 
-loader.save_company_data('ACI')
+loader.save_company_data(['ACI'])
