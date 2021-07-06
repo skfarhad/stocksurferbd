@@ -28,23 +28,28 @@ def append_historical_data(symbol, df_cur, csv_path=''):
     dates = df_history['DATE'].values
     # print(df_history.head())
     latest_date = df_cur[df_cur['TRADING_CODE'] == symbol]['DATE'].values[0]
+    cur_row = df_cur[df_cur['TRADING_CODE'] == symbol]
+    data_dict = {
+        'DATE': latest_date,
+        'TRADING_CODE': symbol,
+        'LTP': cur_row['LTP'].values[0],
+        'HIGH': cur_row['HIGH'].values[0],
+        'LOW': cur_row['LOW'].values[0],
+        'OPENP': cur_row['LTP'].values[0],
+        'CLOSEP': cur_row['LTP'].values[0],
+        'YCP': cur_row['YCP'].values[0],
+        'TRADE': cur_row['TRADE'].values[0],
+        'VALUE_MN': cur_row['VALUE_MN'].values[0],
+        'VOLUME': cur_row['VOLUME'].values[0],
+    }
     if latest_date not in dates:
-        cur_row = df_cur[df_cur['TRADING_CODE'] == symbol]
         df_history = df_history.append(
-            {
-                'DATE': latest_date,
-                'TRADING_CODE': symbol,
-                'LTP': cur_row['LTP'].values[0],
-                'HIGH': cur_row['HIGH'].values[0],
-                'LOW': cur_row['LOW'].values[0],
-                'CLOSEP': cur_row['CLOSEP'].values[0],
-                'YCP': cur_row['YCP'].values[0],
-                'TRADE': cur_row['TRADE'].values[0],
-                'VALUE_MN': cur_row['VALUE_MN'].values[0],
-                'VOLUME': cur_row['VOLUME'].values[0],
-            },
+            data_dict,
             ignore_index=True
         )
+    else:
+        df_history.loc[df_history['DATE'] == latest_date, data_dict.keys()] = data_dict.values()
+
     df_history['DATE'] = pd.to_datetime(df_history['DATE'])
     df_history.sort_values(by='DATE', inplace=True)
     df_history.reset_index(inplace=True)

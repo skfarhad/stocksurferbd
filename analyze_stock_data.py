@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 import mplfinance as mplf
+import talib
 from matplotlib.ticker import MultipleLocator
 from scipy import stats
 import talib as ta
@@ -14,7 +15,6 @@ from pyti.bollinger_bands import upper_bollinger_band as bb_up
 from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
 from tapy import Indicators
-
 
 RISK_R = 32
 HISTORY_FOLDER = 'dse_history_data'
@@ -106,7 +106,7 @@ def aggregate_history_data(symbols, data_n=90, n_short=RISK_R):
                     'max_loss': max_loss,
                     'avg_trade': avg_trade,
                     'avg_volume_mn': avg_volume,
-                    'per_trade_k': (volume/trade).mean() * 1000,
+                    'per_trade_k': (volume / trade).mean() * 1000,
                     'slope_s': slope_s,
                     'slope_l': slope_l,
                 },
@@ -151,107 +151,192 @@ def process_data_mpl(file_path='', data_len=720, train_len=40):
     return df
 
 
-def candelstick_plot(symbol, data, purchased_at=False):
+def show_pnl(symbol, data, n_short, purchased_at):
     ltp = data['Close'][-1:].values[0]
-    max_p = max(data['Close'][-RISK_R:].values)
-    gain = ((max_p - ltp)/ltp) * 100
-    min_p = min(data['Close'][-RISK_R:].values)
+    max_p = max(data['Close'][-n_short:].values)
+    gain = ((max_p - ltp) / ltp) * 100
+    min_p = min(data['Close'][-n_short:].values)
     trade = data['Trade']
-    loss = ((ltp - min_p)/ltp)*100
+    loss = ((ltp - min_p) / ltp) * 100
     print('-----------------------------------------------------')
     print('Symbol: ' + symbol + ', LTP: ' + str(ltp) +
-        ', ' + str(RISK_R) + ' day % gain:loss- ' +
-        str(round(gain, 2)) + ":" + str(round(loss, 2))
-    )
+          ', ' + str(n_short) + ' days max % up/down: ' +
+          str(round(gain, 2)) + "/" + str(round(loss, 2))
+          )
+
     if purchased_at:
         print(
             'Purchased at: ' + str(purchased_at) +
-            ', Current gain: ' + str(round(((ltp - purchased_at)/purchased_at) * 100, 2))
+            ', Current gain: ' + str(round(((ltp - purchased_at) / purchased_at) * 100, 2))
         )
-    macd, macd_signal, macd_hist = ta.MACD(data['Close'])
 
-    # macd panel
-    color_up = 'limegreen'
-    color_down = 'tomato'
+
+def add_bb_plots(plots, data, period=20, panel=0):
+    data_cl = data['Close'].values.tolist()
+    bb_u = bb_up(data_cl, period)
+    bb_l = bb_low(data_cl, period)
+    bb_m = bb_mid(data_cl, period)
+
+    bb_m_plot = mplf.make_addplot(bb_m, panel=panel, color='cyan', width=1, alpha=0.5)
+    bb_l_plot = mplf.make_addplot(bb_l, panel=panel, color='yellow', width=1, alpha=0.3)
+    bb_u_plot = mplf.make_addplot(bb_u, panel=panel, color='yellow', width=1, alpha=0.3)
+    plots.extend([
+        bb_u_plot, bb_m_plot, bb_l_plot
+    ])
+
+
+def add_macd_plots(plots, data, color_up, color_down, panel=1):
+    macd, macd_signal, macd_hist = ta.MACD(data['Close'])
 
     colors = [color_up if v >= 0 else color_down for v in macd_hist]
     macd_plot = mplf.make_addplot(
-        macd, panel=1, color='orange', width=1, ylabel='MACD'
+        macd, panel=panel, color='orange', width=1, ylabel='MACD',
+        secondary_y=False,
+        y_on_right=False
     )
-    macd_hist_plot = mplf.make_addplot(macd_hist, type='bar', panel=1, color=colors)
-    macd_signal_plot = mplf.make_addplot(macd_signal, panel=1, color='blue', width=1)
+    macd_hist_plot = mplf.make_addplot(
+        macd_hist, type='bar', panel=panel, color=colors,
+        secondary_y=False
 
-    data_cl = data['Close'].values.tolist()
-    ma1, ma2 = 5, 20
-    bb_u = bb_up(data_cl, ma2)
-    bb_l = bb_low(data_cl, ma2)
-    bb_m = bb_mid(data_cl, ma2)
+    )
+    macd_signal_plot = mplf.make_addplot(
+        macd_signal, panel=panel, color='blue', width=1,
+        secondary_y=False
+    )
 
-    bb_m_plot = mplf.make_addplot(bb_m, panel=0, color='cyan', width=1, alpha=0.5)
-    bb_l_plot = mplf.make_addplot(bb_l, panel=0, color='yellow', width=1, alpha=0.5)
-    bb_u_plot = mplf.make_addplot(bb_u, panel=0, color='yellow', width=1, alpha=0.5)
+    plots.extend([
+        macd_plot, macd_signal_plot, macd_hist_plot
+    ])
 
-    data_short = data['Close'][-RISK_R:]
+
+def add_rsi_plot(plots, data, color_up, color_down, panel=0, timeperiod=10):
+    n_data = len(data)
+    rsi = talib.RSI(data['Close'], timeperiod=timeperiod)
+
+    line_rsi = mplf.make_addplot(
+        rsi, panel=panel, color='gray', ylabel='RSI', width=1.5,
+    )
+
+    line_os = mplf.make_addplot(
+        [70] * n_data, panel=panel,
+        color=color_down, alpha=.5, linestyle='dashed', width=1.5,
+        secondary_y=False
+    )
+    line_ob = mplf.make_addplot(
+        [30] * n_data,
+        panel=panel,
+        color=color_up, alpha=.5, linestyle='dashed', width=1.5,
+        secondary_y=False,
+        ylabel='RSI'
+    )
+
+    plots.extend([
+        line_os, line_rsi, line_ob
+    ])
+
+
+def add_line_plots(plots, data, n_short=RISK_R, purchased_at=False, panel=0):
+    data_short = data['Close'][-n_short:]
     data_n = len(data)
     x_tr = range(0, len(data_short))
     slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
     y_tr_value = slope * x_tr + y_tr
     y_tr_value = np.concatenate((
-        [np.NaN] * (data_n - RISK_R), y_tr_value
+        [np.NaN] * (data_n - n_short), y_tr_value
     ))
 
-    data_long = data['Close'][: (data_n - RISK_R)]
+    data_long = data['Close'][: (data_n - n_short)]
     x_tr2 = range(0, len(data_long))
     slope2, y_tr2, r_val, p_val, std_err = stats.linregress(x_tr2, data_long)
     y_tr_value2 = slope2 * x_tr2 + y_tr2
     y_tr_value2 = np.concatenate((
-        y_tr_value2, [np.NaN] * RISK_R
+        y_tr_value2, [np.NaN] * n_short
     ))
 
     y_tr_plot = mplf.make_addplot(
-        y_tr_value, panel=0, color='coral', width=2, alpha=0.4, linestyle='dashed'
+        y_tr_value, panel=panel,
+        color='coral', width=2, alpha=0.4, linestyle='dashed'
     )
-    price_plot = mplf.make_addplot(data['Close'], panel=0, color='white', width=1, alpha=0.5)
-
-    vol_colors = data.apply(lambda x: color_up if x['Close'] > x['Open'] else color_down, axis=1)
-    volume_plot = mplf.make_addplot(
-        data['Volume'], panel=2, color=vol_colors.values, type='bar', ylabel='Value(Mil)',
+    price_plot = mplf.make_addplot(
+        data['Close'].rolling(window=5).mean(),
+        panel=panel,
+        color='white', width=1, alpha=0.5
     )
     y_tr_plot2 = mplf.make_addplot(
-        y_tr_value2, panel=0, color='coral', width=2, alpha=0.4, linestyle='dashed'
+        y_tr_value2, panel=panel,
+        color='coral', width=2, alpha=0.4, linestyle='dashed'
     )
 
-    # trade_plot = mplf.make_addplot(trade.values, panel=2, color='gray', type='bar')
-
-    # ind = Indicators(data)
-    # ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
-    # data = ind.df
-    # data['fr_high'] = data.apply(lambda x: x['Close'] if x['fr_high'] else 0, axis=1)
-    # data['fr_low'] = data.apply(lambda x: x['Close'] if x['fr_low'] else 0, axis=1)
-    #
-    # print(data[['Date','Close', 'fr_high', 'fr_low']])
-    #
-    # fr_high_plot = mplf.make_addplot(data['fr_high'], panel=0, color='gray', width=1, linestyle='dashed')
-    # fr_low_plot = mplf.make_addplot(data['fr_low'], panel=0, color='orange', width=1, linestyle='dashed')
-
-    # plot
-    plots = [
-        price_plot,
-        macd_plot, macd_signal_plot, macd_hist_plot,
-        bb_u_plot, bb_m_plot, bb_l_plot,
-        y_tr_plot,
-        y_tr_plot2,
-        volume_plot,
-        # trade_plot,
-        # fr_low_plot,
-        # fr_high_plot
-    ]
+    plots.extend([
+        y_tr_plot, price_plot, y_tr_plot2
+    ])
 
     if purchased_at:
         purchased_at_plot = mplf.make_addplot(
-            [purchased_at] * data_n, panel=0, color='white', width=2, alpha=0.4, linestyle='dashed'
+            [purchased_at] * data_n,
+            panel=panel,
+            color='white', width=2, alpha=0.4, linestyle='dashed'
         )
         plots.append(purchased_at_plot)
+
+
+def add_vol_plots(plots, data, color_up, color_down, vol_panel=2):
+    vol_colors = data.apply(
+        lambda x: color_up if x['Close'] > x['Open'] else color_down,
+        axis=1
+    )
+    volume_plot = mplf.make_addplot(
+        data['Volume'],
+        panel=vol_panel,
+        color=vol_colors.values,
+        type='bar',
+        ylabel='Value(Mil)',
+    )
+    plots.append(volume_plot)
+
+
+def add_fractal_plot(plots, data, color_up, color_down, panel=0):
+    ind = Indicators(data)
+    ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
+    data = ind.df
+    data['fr_high'] = data.apply(lambda x: x['Close'] * 1.1 if x['fr_high'] else np.NaN, axis=1)
+    data['fr_low'] = data.apply(lambda x: x['Close'] * 0.9 if x['fr_low'] else np.NaN, axis=1)
+
+    fr_high_plot = mplf.make_addplot(
+        data['fr_high'], panel=panel,
+        color=color_down, width=.2, type='scatter', alpha=.6,
+        secondary_y=False,
+    )
+    fr_low_plot = mplf.make_addplot(
+        data['fr_low'], panel=panel,
+        color=color_up, width=.2, type='scatter', alpha=.6,
+        secondary_y=False,
+
+    )
+    plots.extend([fr_high_plot, fr_low_plot])
+
+
+def candelstick_plot(symbol, data, n_short=RISK_R, purchased_at=False):
+    show_pnl(symbol, data, n_short, purchased_at)
+    color_up = 'limegreen'
+    color_down = 'tomato'
+    plots = []
+
+    add_rsi_plot(plots, data, color_up, color_down, panel=0)
+    add_line_plots(
+        plots, data, n_short=RISK_R, purchased_at=purchased_at,
+        panel=1
+    )
+    add_bb_plots(plots, data, period=20, panel=1)
+    add_fractal_plot(
+        plots, data, color_up='white', color_down='dodgerblue',
+        panel=1
+    )
+
+    # add_macd_plots(plots, data, color_up, color_down, panel=2)
+    add_macd_plots(plots, data, color_up, color_down, panel=2)
+
+    add_vol_plots(plots, data, color_up, color_down, vol_panel=3)
 
     custom_nc = mplf.make_mpf_style(
         base_mpf_style='nightclouds',
@@ -269,15 +354,14 @@ def candelstick_plot(symbol, data, purchased_at=False):
     mplf.plot(
         data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']],
         type='candle',
+        main_panel=1,
         style=custom_nc,
         title='Chart for: ' + symbol,
         ylabel='Price (Tk)',
-        figratio=(18, 7),
+        figratio=(18, 8),
         addplot=plots,
-        # volume=True,
-        # volume_panel=2,
         scale_padding={'left': 1, 'top': 1, 'right': 1, 'bottom': 1},
-        panel_ratios=(1, 0.3, .3),
+        panel_ratios=(0.3, 1, 0.3, .3),
         xrotation=7.5,
         # tight_layout=True,
         # show_nontrading=True,
@@ -310,7 +394,7 @@ def visualize_candlestick_data_with_price(sym_w_prices, data_n=360):
             data = data[data['High'] > 0]
             data = data[data['Close'] > 0]
             data = data[-data_n:]
-            candelstick_plot(symbol[0], data, symbol[1])
+            candelstick_plot(symbol=symbol[0], data=data, purchased_at=symbol[1])
         except Exception as e:
             print(str(e))
 
@@ -323,7 +407,3 @@ def visualize_candlestick_data_single(symbol, data_n=360):
         candelstick_plot(symbol, data)
     except Exception as e:
         print(str(e))
-
-
-
-
