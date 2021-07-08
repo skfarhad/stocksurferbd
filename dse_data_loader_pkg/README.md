@@ -18,9 +18,9 @@ loader = FundamentalData()
 loader.save_company_data(['ACI'])
 
 ```
-The above code will crete two files named 'company_data.csv' & 'financial_data.csv' in current folder.
-The file named company_data.csv contains the fundamental data for current year
-financial_data.csv contains year wise fundmental data according to [DSE website](http://dsebd.org).
+The above code will create two files named 'company_data.csv' & 'financial_data.csv' in current folder.
+The file named company_data.csv contains the fundamental data for current year and
+financial_data.csv contains year-wise fundmental data according to [DSE website](http://dsebd.org).
 
 Downloading historical price data of a stock-
 
