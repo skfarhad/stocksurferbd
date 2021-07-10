@@ -419,7 +419,7 @@ def visualize_candlestick_data(
         print(str(e))
 
 
-path = os.path.join(HISTORY_FOLDER, 'ACI_history_data.csv')
-cd_plot = CandlestickPlot(csv_path=path, symbol='ACI')
-cd_plot.show_plot(xtick_count=120, resample=True, step='3D')
+# path = os.path.join(HISTORY_FOLDER, 'ACI_history_data.csv')
+# cd_plot = CandlestickPlot(csv_path=path, symbol='ACI')
+# cd_plot.show_plot(xtick_count=120, resample=True, step='3D')
 

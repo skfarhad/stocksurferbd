@@ -376,7 +376,7 @@ class FundamentalData(object):
             raise TypeError("Either list or tuple is allowed for 'symbols' parameter!")
         for symbol in symbols:
             full_url = self.DSE_COMPANY_URL + symbol
-            target_page = requests.get(full_url, verify=False)
+            target_page = requests.get(full_url)
             page_html = BeautifulSoup(target_page.text, 'html.parser')
             dict_company, dict_fin_perf = self.parse_company_data_rows(
                 page_html, symbol
@@ -402,5 +402,5 @@ class FundamentalData(object):
         company_df = pd.DataFrame()
         fin_df = pd.DataFrame()
         company_df, fin_df = self.get_company_df(symbols, company_df, fin_df)
-        company_df.to_csv(os.path.join(path, 'company_data.csv'))
-        fin_df.to_csv(os.path.join(path, 'financial_data.csv'))
+        company_df.to_csv(os.path.join(path, 'company_data.csv'), index=False)
+        fin_df.to_csv(os.path.join(path, 'financial_data.csv'), index=False)
