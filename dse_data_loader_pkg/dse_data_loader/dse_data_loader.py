@@ -171,6 +171,7 @@ class FundamentalData(object):
             'face_value': company_info['basic'][2][0],
             'market_lot': company_info['basic'][2][1],
             'ltp': company_info['ltp'],
+            'last_agm_date': company_info['last_agm_date'],
             'market_cap': company_info['market_cap'],
             'outstanding_share': company_info['basic'][3][0],
             'sector': company_info['basic'][3][1],
@@ -278,6 +279,15 @@ class FundamentalData(object):
         company_info = {}
         fin_perf_info = {}
         fin_interim_info = {}
+        agm_info = soup.find(
+            "div",
+            attrs={
+                "class": "col-sm-6 pull-left"
+            }
+        )
+        # print(agm_info.text)
+        date_txt = " ".join(agm_info.text.split('on:')[1].strip().split())
+        last_agm_date = parser.parse(date_txt).date()
 
         company_tables = soup.find_all(
             "table",
@@ -300,7 +310,8 @@ class FundamentalData(object):
             if count == 1:
                 company_info.update({
                     'ltp': cur_list[0][1],
-                    'market_cap': cur_list[6][1]
+                    'market_cap': cur_list[6][1],
+                    'last_agm_date': last_agm_date
                 })
 
             if count == 2:
@@ -370,6 +381,7 @@ class FundamentalData(object):
             dict_company, dict_fin_perf = self.parse_company_data_rows(
                 page_html, symbol
             )
+            print("Fetching data for: ", symbol)
             df_company = self.append_company(
                 company_info=dict_company['company_info'],
                 fin_interim_info=dict_company['fin_interim_info'],
@@ -381,6 +393,7 @@ class FundamentalData(object):
                 df_fin_perf=df_fin_perf,
                 symbol=symbol
             )
+            print("Fetch complete!")
         return df_company, df_fin_perf
 
     def save_company_data(self, symbols, path=''):

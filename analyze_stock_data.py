@@ -111,10 +111,10 @@ def process_data_mpl(file_path='', resample=False, step='3D'):
     return df
 
 
-def aggregate_history_data(symbols, data_n=90, resample=False, step='3D'):
+def aggregate_history_data(symbols, categories, data_n=90, resample=False, step='3D'):
     path = HISTORY_FOLDER
     df = pd.DataFrame()
-    for symbol in symbols:
+    for symbol, cat in zip(symbols, categories):
         full_path = os.path.join(path, symbol + '_history_data.csv')
         try:
             data_df = process_data_mpl(full_path, resample=resample, step=step)
@@ -141,6 +141,7 @@ def aggregate_history_data(symbols, data_n=90, resample=False, step='3D'):
             df = df.append(
                 {
                     'symbol': symbol,
+                    'market_category': cat,
                     'ltp': ltp,
                     # 'x_close': x_close,
                     # 'avg_x_dist': avg_x_dist,
@@ -160,14 +161,14 @@ def aggregate_history_data(symbols, data_n=90, resample=False, step='3D'):
     return df
 
 
-def show_pnl(symbol, data, n_short, purchased_at):
+def show_pnl(symbol, data, n_short, purchased_at, category='A'):
     ltp = data['Close'][-1:].values[0]
     max_p = max(data['Close'][-n_short:].values)
     gain = ((max_p - ltp) / ltp) * 100
     min_p = min(data['Close'][-n_short:].values)
     loss = ((ltp - min_p) / ltp) * 100
     print('-----------------------------------------------------')
-    print('Symbol: ' + symbol + ', LTP: ' + str(ltp) +
+    print('Symbol: ' + symbol + "(c)".replace('c', category) + ', LTP: ' + str(ltp) +
           ', ' + str(n_short) + ' days max % up/down: ' +
           str(round(gain, 2)) + "/" + str(round(loss, 2))
           )
@@ -194,7 +195,9 @@ def add_bb_plots(plots, data, period=20, panel=0):
 
 
 def add_macd_plots(plots, data, color_up, color_down, panel=1):
-    macd, macd_signal, macd_hist = ta.MACD(data['Close'])
+    macd, macd_signal, macd_hist = ta.MACD(
+        data['Close'], fastperiod=10, slowperiod=22, signalperiod=7
+    )
 
     colors = [color_up if v >= 0 else color_down for v in macd_hist]
     macd_plot = mplf.make_addplot(
@@ -325,9 +328,9 @@ def add_fractal_plot(plots, data, color_up, color_down, panel=0):
     plots.extend([fr_high_plot, fr_low_plot])
 
 
-def candelstick_plot(symbol, data, purchased_at=False):
+def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
     n_short = get_n_short(len(data))
-    show_pnl(symbol, data, n_short, purchased_at)
+    show_pnl(symbol, data, n_short, purchased_at, category)
     color_up = 'limegreen'
     color_down = 'tomato'
     plots = []
@@ -363,7 +366,7 @@ def candelstick_plot(symbol, data, purchased_at=False):
         type='candle',
         main_panel=1,
         style=custom_nc,
-        title=symbol,
+        title=symbol + ': ' + step ,
         ylabel='Price (Tk)',
         figratio=(18, 8),
         addplot=plots,
@@ -378,33 +381,37 @@ def candelstick_plot(symbol, data, purchased_at=False):
     # axlist[0].xaxis.set_minor_locator(MultipleLocator(1))
 
 
-def visualize_candlestick_data(symbols, data_n=360, resample=False, step='3D'):
-    for symbol in symbols:
-        try:
-            path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
-            data = process_data_mpl(path, resample=resample, step=step)
-            data = data[-data_n:]
-            candelstick_plot(symbol, data)
-        except Exception as e:
-            print(str(e))
+def visualize_candlestick_data_list(
+        symbols, categories, data_n=360, resample=False, step='3D'
+):
+    for symbol, cat in zip(symbols, categories):
+        visualize_candlestick_data(
+            symbol, cat, data_n=data_n, resample=resample, step=step
+        )
 
 
 def visualize_candlestick_data_with_price(sym_w_prices, data_n=360, resample=False, step='3D'):
-    for symbol in sym_w_prices:
+    for sym_p in sym_w_prices:
         try:
-            path = os.path.join(HISTORY_FOLDER, symbol[0] + '_history_data.csv')
+            path = os.path.join(HISTORY_FOLDER, sym_p[0] + '_history_data.csv')
             data = process_data_mpl(path, resample=resample, step=step)
             data = data[-data_n:]
-            candelstick_plot(symbol=symbol[0], data=data, purchased_at=symbol[1])
+            if not resample:
+                step = '1D'
+            candelstick_plot(symbol=sym_p[0], data=data, purchased_at=sym_p[1], step=step)
         except Exception as e:
             print(str(e))
 
 
-def visualize_candlestick_data_single(symbol, data_n=360, resample=False, step='3D'):
+def visualize_candlestick_data(
+        symbol, category='A', data_n=360, resample=False, step='3D'
+):
     try:
         path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
         data = process_data_mpl(path, resample=resample, step=step)
         data = data[-data_n:]
-        candelstick_plot(symbol, data)
+        if not resample:
+            step = '1D'
+        candelstick_plot(symbol, data, category=category, step=step)
     except Exception as e:
         print(str(e))

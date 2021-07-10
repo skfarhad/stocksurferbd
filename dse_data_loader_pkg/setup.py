@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="dse-data-loader",
-    version="0.0.2",
+    version="0.0.3",
     author="Sk Farhad",
     author_email="sk.farhad.eee@gmail.com",
     description="This is a tool to download stock market data of Dhaka Stock Exchange.",
@@ -31,3 +31,7 @@ setuptools.setup(
     python_requires=">=3.6",
     zip_safe=False
 )
+
+
+# python setup.py sdist bdist_wheel
+# twine upload dist/*
