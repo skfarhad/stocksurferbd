@@ -6,47 +6,80 @@ __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 import numpy as np
 import pandas as pd
 import mplfinance as mplf
-import talib
 from scipy import stats
-import talib as ta
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
 from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
+from pyti.relative_strength_index import relative_strength_index as RSI
 from tapy import Indicators
 
 
 class CandlestickPlot(object):
 
     def __init__(self, csv_path, symbol):
-        self.RISK_R = 32
         self.csv_path = csv_path
+        self.data = None
+        self.plots = []
         self.symbol = symbol
+        self.color_up = 'limegreen'
+        self.color_down = 'tomato'
 
     @staticmethod
-    def get_nc_style(color_up='limegreen', color_down='tomato'):
+    def get_macd(data, n_fast=10, n_slow=22, n_smooth=7):
+        fast_ema = data.ewm(span=n_fast, min_periods=n_slow).mean()
+        slow_ema = data.ewm(span=n_slow, min_periods=n_slow).mean()
+        macd = pd.Series(fast_ema - slow_ema, name='macd')
+        macd_sig = pd.Series(macd.ewm(span=n_smooth, min_periods=n_smooth).mean(), name='macd_sig')
+        macd_hist = pd.Series(macd - macd_sig, name='macd_hist')
+
+        return macd, macd_sig, macd_hist
+
+    @staticmethod
+    def get_n_short(data_len):
+        return data_len // 3
+
+    @staticmethod
+    def get_weekly(df, step='3D'):
+        agg_dict = {
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Trade': 'mean',
+            'Volume': 'mean'
+        }
+
+        # resampled dataframe
+        # 'W' means weekly aggregation
+        df = df.resample(step).agg(agg_dict)
+        return df
+
+    def get_nc_style(self):
+        color_up, color_down = self.color_up, self.color_down
         ncs = mplf.make_mpf_style(
             base_mpf_style='nightclouds',
-            marketcolors={'candle': {'up': color_up, 'down': color_down},
-                          'edge': {'up': color_up, 'down': color_down},
-                          'wick': {'up': color_up, 'down': color_down},
-                          'ohlc': {'up': color_up, 'down': color_down},
-                          'volume': {'up': color_up, 'down': color_down},
-                          'vcdopcod': True,  # Volume Color Depends On Price Change On Day
-                          'alpha': 1.0,
-                          },
+            marketcolors={
+                'candle': {'up': color_up, 'down': color_down},
+                'edge': {'up': color_up, 'down': color_down},
+                'wick': {'up': color_up, 'down': color_down},
+                'ohlc': {'up': color_up, 'down': color_down},
+                'volume': {'up': color_up, 'down': color_down},
+                'vcdopcod': True,  # Volume Color Depends On Price Change On Day
+                'alpha': 1.0,
+            },
             mavcolors=['gray', 'sienna', 'darkslategray', 'purple'],
         )
         return ncs
 
-    @staticmethod
-    def process_data_mpl(file_path='', data_len=720, train_len=40):
+    def process_data_mpl(self, resample=False, step='3D'):
         df = pd.read_csv(
-            file_path,
+            self.csv_path,
             sep=r'\s*,\s*',
             header=0,
             encoding='ascii',
             engine='python',
         )
+        # print(df.head())
         columns = ['DATE', 'CLOSEP', 'VALUE_MN', 'HIGH', 'LOW', 'OPENP', 'TRADE']
         df = df[columns]
         df = df.rename(columns={
@@ -64,13 +97,23 @@ class CandlestickPlot(object):
         df = df[df['Close'] > 0]
 
         df['Date'] = pd.to_datetime(df['Date'])
-        df.sort_values(by='Date', inplace=True)
-        df.reset_index(inplace=True)
-        df.index = pd.DatetimeIndex(df['Date'])
-        return df
+        if resample:
+            df.index = pd.DatetimeIndex(df['Date'])
+            df = self.get_weekly(df, step=step)
+            df.reset_index(level=0, inplace=True)
+            df.sort_values(by='Date', inplace=True)
+            df.index = pd.DatetimeIndex(df['Date'])
+            df.dropna(inplace=True)
+        else:
 
-    @staticmethod
-    def add_bb_plots(plots, data, period=20, panel=0):
+            df.sort_values(by='Date', inplace=True)
+            # df.reset_index(inplace=True)
+            df.index = pd.DatetimeIndex(df['Date'])
+        self.data = df
+        return
+
+    def add_bb_plots(self, period=20, panel=0):
+        data, plots = self.data, self.plots
         data_cl = data['Close'].values.tolist()
         bb_u = bb_up(data_cl, period)
         bb_l = bb_low(data_cl, period)
@@ -83,9 +126,10 @@ class CandlestickPlot(object):
             bb_u_plot, bb_m_plot, bb_l_plot
         ])
 
-    @staticmethod
-    def add_macd_plots(plots, data, color_up, color_down, panel=1):
-        macd, macd_signal, macd_hist = ta.MACD(data['Close'])
+    def add_macd_plots(self, panel=1):
+        data, plots = self.data, self.plots
+        color_up, color_down = self.color_up, self.color_down
+        macd, macd_signal, macd_hist = self.get_macd(data['Close'])
 
         colors = [color_up if v >= 0 else color_down for v in macd_hist]
         macd_plot = mplf.make_addplot(
@@ -107,10 +151,11 @@ class CandlestickPlot(object):
             macd_plot, macd_signal_plot, macd_hist_plot
         ])
 
-    @staticmethod
-    def add_rsi_plot(plots, data, color_up, color_down, panel=0, timeperiod=10):
+    def add_rsi_plot(self, panel=0, timeperiod=10):
+        data, plots = self.data, self.plots
+        color_up, color_down = self.color_up, self.color_down
         n_data = len(data)
-        rsi = talib.RSI(data['Close'], timeperiod=timeperiod)
+        rsi = RSI(data['Close'], period=timeperiod)
 
         line_rsi = mplf.make_addplot(
             rsi, panel=panel, color='gray', ylabel='RSI', width=1.5,
@@ -133,10 +178,11 @@ class CandlestickPlot(object):
             line_os, line_rsi, line_ob
         ])
 
-    @staticmethod
-    def add_line_plots(plots, data, n_short, purchased_at=False, panel=0):
-        data_short = data['Close'][-n_short:]
+    def add_line_plots(self, panel=0):
+        data, plots = self.data, self.plots
         data_n = len(data)
+        n_short = self.get_n_short(data_n)
+        data_short = data['Close'][-n_short:]
         x_tr = range(0, len(data_short))
         slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
         y_tr_value = slope * x_tr + y_tr
@@ -170,16 +216,9 @@ class CandlestickPlot(object):
             y_tr_plot, price_plot, y_tr_plot2
         ])
 
-        if purchased_at:
-            purchased_at_plot = mplf.make_addplot(
-                [purchased_at] * data_n,
-                panel=panel,
-                color='white', width=2, alpha=0.4, linestyle='dashed'
-            )
-            plots.append(purchased_at_plot)
-
-    @staticmethod
-    def add_vol_plots(plots, data, color_up, color_down, vol_panel=2):
+    def add_vol_plots(self, vol_panel=2):
+        color_up, color_down = self.color_up, self.color_down
+        data, plots = self.data, self.plots
         vol_colors = data.apply(
             lambda x: color_up if x['Close'] > x['Open'] else color_down,
             axis=1
@@ -193,8 +232,9 @@ class CandlestickPlot(object):
         )
         plots.append(volume_plot)
 
-    @staticmethod
-    def add_fractal_plot(plots, data, color_up, color_down, panel=0):
+    def add_fractal_plot(self, panel=0):
+        data, plots = self.data, self.plots
+        color_up, color_down = self.color_up, self.color_down
         ind = Indicators(data)
         ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
         data = ind.df
@@ -214,49 +254,38 @@ class CandlestickPlot(object):
         )
         plots.extend([fr_high_plot, fr_low_plot])
 
-    def get_candelstick_plot(self, data, purchased_at=False):
-        color_up = 'limegreen'
-        color_down = 'tomato'
-        plots = []
-        symbol = self.symbol
-
-        self.add_rsi_plot(plots, data, color_up, color_down, panel=0)
-        self.add_line_plots(
-            plots, data, n_short=self.RISK_R, purchased_at=purchased_at,
-            panel=1
-        )
-        self.add_bb_plots(plots, data, period=20, panel=1)
-        self.add_fractal_plot(
-            plots, data, color_up='white', color_down='dodgerblue',
-            panel=1
-        )
-        self.add_macd_plots(plots, data, color_up, color_down, panel=2)
-        self.add_vol_plots(plots, data, color_up, color_down, vol_panel=3)
-
-        custom_nc = self.get_nc_style(color_up, color_down)
-        fig, axlist = mplf.plot(
-            data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']],
+    def show_candelstick_plot(self, step='1D'):
+        self.add_rsi_plot(panel=0)
+        self.add_line_plots(panel=1)
+        self.add_bb_plots(period=20, panel=1)
+        # self.add_fractal_plot(panel=1)
+        self.add_macd_plots(panel=2)
+        self.add_vol_plots(vol_panel=3)
+        custom_nc = self.get_nc_style()
+        data_mpl = self.data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']]
+        mplf.plot(
+            data_mpl,
             type='candle',
             main_panel=1,
             style=custom_nc,
-            title='Chart for: ' + symbol,
+            title=self.symbol + ': ' + step,
             ylabel='Price (Tk)',
             figratio=(18, 8),
-            addplot=plots,
+            addplot=self.plots,
             scale_padding={'left': 1, 'top': 1, 'right': 1, 'bottom': 1},
             panel_ratios=(0.3, 1, 0.3, .3),
             xrotation=7.5,
-            # tight_layout=True,
+            tight_layout=True,
             # show_nontrading=True,
-            returnfig=True
+            # returnfig=True
         )
-        return fig, axlist
 
-    def show_plot(self, day_count=360):
-        try:
-            data = self.process_data_mpl(self.csv_path)
-            data = data[-day_count:]
-            fig, axlist = self.get_candelstick_plot(data=data)
-            fig.show()
-        except Exception as e:
-            print(str(e))
+        return
+
+    def show_plot(self, xtick_count=120, resample=False, step='1D'):
+        self.process_data_mpl(resample=resample, step=step)
+        self.data = self.data[-xtick_count:]
+        if not resample:
+            step = '1D'
+        self.show_candelstick_plot(step=step)
+

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import mplfinance as mplf
 import talib
-from matplotlib.ticker import MultipleLocator
+# from matplotlib.ticker import MultipleLocator
 from scipy import stats
 import talib as ta
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
@@ -16,6 +16,8 @@ from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
 from tapy import Indicators
 HISTORY_FOLDER = 'dse_history_data'
+
+from dse_data_loader_pkg import CandlestickPlot
 
 
 def clean_x(x):
@@ -382,7 +384,7 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
 
 
 def visualize_candlestick_data_list(
-        symbols, categories, data_n=360, resample=False, step='3D'
+        symbols, categories, data_n=120, resample=False, step='3D'
 ):
     for symbol, cat in zip(symbols, categories):
         visualize_candlestick_data(
@@ -390,7 +392,7 @@ def visualize_candlestick_data_list(
         )
 
 
-def visualize_candlestick_data_with_price(sym_w_prices, data_n=360, resample=False, step='3D'):
+def visualize_candlestick_data_with_price(sym_w_prices, data_n=120, resample=False, step='3D'):
     for sym_p in sym_w_prices:
         try:
             path = os.path.join(HISTORY_FOLDER, sym_p[0] + '_history_data.csv')
@@ -404,7 +406,7 @@ def visualize_candlestick_data_with_price(sym_w_prices, data_n=360, resample=Fal
 
 
 def visualize_candlestick_data(
-        symbol, category='A', data_n=360, resample=False, step='3D'
+    symbol, category='A', data_n=120, resample=False, step='3D'
 ):
     try:
         path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
@@ -415,3 +417,9 @@ def visualize_candlestick_data(
         candelstick_plot(symbol, data, category=category, step=step)
     except Exception as e:
         print(str(e))
+
+
+path = os.path.join(HISTORY_FOLDER, 'ACI_history_data.csv')
+cd_plot = CandlestickPlot(csv_path=path, symbol='ACI')
+cd_plot.show_plot(xtick_count=120, resample=True, step='3D')
+

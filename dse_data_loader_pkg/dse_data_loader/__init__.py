@@ -6,3 +6,4 @@ __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 
 from .dse_data_loader import PriceData
 from .dse_data_loader import FundamentalData
+from .price_plots import CandlestickPlot

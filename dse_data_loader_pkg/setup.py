@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="dse-data-loader",
-    version="0.0.3",
+    version="0.0.31",
     author="Sk Farhad",
     author_email="sk.farhad.eee@gmail.com",
     description="This is a tool to download stock market data of Dhaka Stock Exchange.",
@@ -21,9 +21,14 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        'requests',
-        'pandas',
-        'beautifulsoup4'
+        'requests==2.25.1',
+        'pandas==1.2.3',
+        'scipy==1.6.2',
+        'beautifulsoup4==4.9.3',
+        'matplotlib==3.4.1',
+        'mplfinance==0.12.7a17',
+        'pyti==0.2.2',
+        'tapy==1.9.1',
     ],
     # package_dir={"": "src"},
     # packages=setuptools.find_packages(where="dse_data_loader"),
