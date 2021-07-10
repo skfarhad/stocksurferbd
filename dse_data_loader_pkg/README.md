@@ -79,7 +79,7 @@ Stock broker trading panels. There are 3 parameters-
 
 The following are some example images of Candlestick plots-
 
-![Candlestick Plot](http://url/to/img.png)
-![Candlestick Plot](http://url/to/img.png)
+![Candlestick Plot](https://github.com/skfarhad/algo-trading/blob/master/dse_data_loader_pkg/example_plot.jpg?raw=true)
+<br><br>![Candlestick Plot 3days](https://github.com/skfarhad/algo-trading/blob/master/dse_data_loader_pkg/example_plot_3D.jpg?raw=true)
 
 This is the minimal documentation. It'll be improved continuously (hopefully!). 
