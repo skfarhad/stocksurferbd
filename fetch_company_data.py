@@ -5,7 +5,7 @@ __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 
 
 import pandas as pd
-from dse_data_loader_pkg import FundamentalData
+from stocksurferbd_pkg import FundamentalData
 loader = FundamentalData()
 
 

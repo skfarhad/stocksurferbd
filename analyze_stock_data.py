@@ -7,17 +7,17 @@ import os
 import numpy as np
 import pandas as pd
 import mplfinance as mplf
-import talib
 # from matplotlib.ticker import MultipleLocator
+from matplotlib import pyplot as plt
 from scipy import stats
-import talib as ta
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
 from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
+from pyti.relative_strength_index import relative_strength_index as pyti_rsi
 from tapy import Indicators
 HISTORY_FOLDER = 'dse_history_data'
 
-from dse_data_loader_pkg import CandlestickPlot
+from stocksurferbd_pkg import CandlestickPlot
 
 
 def clean_x(x):
@@ -33,7 +33,7 @@ def clean_x(x):
 
 
 def get_n_short(data_len):
-    return data_len//3
+    return data_len//4
 
 
 def get_crossing(y_val, kpi_data):
@@ -70,6 +70,16 @@ def get_weekly(df, step='3D'):
     # 'W' means weekly aggregation
     df = df.resample(step).agg(agg_dict)
     return df
+
+
+def get_macd(data, n_fast=10, n_slow=22, n_smooth=7):
+    fast_ema = data.ewm(span=n_fast, min_periods=n_slow).mean()
+    slow_ema = data.ewm(span=n_slow, min_periods=n_slow).mean()
+    macd = pd.Series(fast_ema - slow_ema, name='macd')
+    macd_sig = pd.Series(macd.ewm(span=n_smooth, min_periods=n_smooth).mean(), name='macd_sig')
+    macd_hist = pd.Series(macd - macd_sig, name='macd_hist')
+
+    return macd, macd_sig, macd_hist
 
 
 def process_data_mpl(file_path='', resample=False, step='3D'):
@@ -196,10 +206,8 @@ def add_bb_plots(plots, data, period=20, panel=0):
     ])
 
 
-def add_macd_plots(plots, data, color_up, color_down, panel=1):
-    macd, macd_signal, macd_hist = ta.MACD(
-        data['Close'], fastperiod=10, slowperiod=22, signalperiod=7
-    )
+def add_macd_plots(plots, data, color_up, color_down, panel=2):
+    macd, macd_signal, macd_hist = get_macd(data['Close'])
 
     colors = [color_up if v >= 0 else color_down for v in macd_hist]
     macd_plot = mplf.make_addplot(
@@ -222,9 +230,9 @@ def add_macd_plots(plots, data, color_up, color_down, panel=1):
     ])
 
 
-def add_rsi_plot(plots, data, color_up, color_down, panel=0, timeperiod=10):
+def add_rsi_plot(plots, data, color_up, color_down, panel=0):
     n_data = len(data)
-    rsi = talib.RSI(data['Close'], timeperiod=timeperiod)
+    rsi = pyti_rsi(data['Close'], period=10)
 
     line_rsi = mplf.make_addplot(
         rsi, panel=panel, color='gray', ylabel='RSI', width=1.5,
@@ -363,7 +371,7 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
         mavcolors=['gray', 'sienna', 'darkslategray', 'purple'],
     )
     data_mpl = data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']]
-    mplf.plot(
+    fig, axlist = mplf.plot(
         data_mpl,
         type='candle',
         main_panel=1,
@@ -377,16 +385,32 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
         xrotation=7.5,
         tight_layout=True,
         # show_nontrading=True,
-        # returnfig=True
+        returnfig=True
     )
-    # fig, axlist = mplf.plot()
-    # axlist[0].xaxis.set_minor_locator(MultipleLocator(1))
+    return fig
+
+
+def visualize_candlestick_data(
+    symbol, category='A', data_n=120, resample=False, step='3D'
+):
+    try:
+        path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
+        data = process_data_mpl(path, resample=resample, step=step)
+        data = data[-data_n:]
+        if not resample:
+            step = '1D'
+        fig = candelstick_plot(symbol, data, category=category, step=step)
+        plt.show()
+    except Exception as e:
+        print(str(e))
 
 
 def visualize_candlestick_data_list(
         symbols, categories, data_n=120, resample=False, step='3D'
 ):
     for symbol, cat in zip(symbols, categories):
+        if not resample:
+            step = '1D'
         visualize_candlestick_data(
             symbol, cat, data_n=data_n, resample=resample, step=step
         )
@@ -400,26 +424,16 @@ def visualize_candlestick_data_with_price(sym_w_prices, data_n=120, resample=Fal
             data = data[-data_n:]
             if not resample:
                 step = '1D'
-            candelstick_plot(symbol=sym_p[0], data=data, purchased_at=sym_p[1], step=step)
+            fig = candelstick_plot(symbol=sym_p[0], data=data, purchased_at=sym_p[1], step=step)
+            plt.show()
         except Exception as e:
             print(str(e))
-
-
-def visualize_candlestick_data(
-    symbol, category='A', data_n=120, resample=False, step='3D'
-):
-    try:
-        path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
-        data = process_data_mpl(path, resample=resample, step=step)
-        data = data[-data_n:]
-        if not resample:
-            step = '1D'
-        candelstick_plot(symbol, data, category=category, step=step)
-    except Exception as e:
-        print(str(e))
 
 
 # path = os.path.join(HISTORY_FOLDER, 'ACI_history_data.csv')
 # cd_plot = CandlestickPlot(csv_path=path, symbol='ACI')
 # cd_plot.show_plot(xtick_count=120, resample=True, step='3D')
+
+# jt -t monokai -f fira -fs 11 -nf ptsans -nfs 10 -N -kl -cursw 3 -cursc g -cellw 85% -T
+
 

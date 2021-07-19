@@ -20,5 +20,5 @@ ta-lib/
 company_info/
 dse_history_data/
 *.egg-info/
-dse_data_loader_pkg/build/
-dse_data_loader_pkg/dist/
+stocksurferbd_pkg/build/
+stocksurferbd_pkg/dist/

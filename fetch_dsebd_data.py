@@ -6,7 +6,7 @@ __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 import os
 import pandas as pd
 
-from dse_data_loader_pkg import PriceData
+from stocksurferbd_pkg import PriceData
 
 
 CUR_FILE_NAME = 'dsebd_current_data.csv'

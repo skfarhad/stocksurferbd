@@ -6,6 +6,7 @@ __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 import numpy as np
 import pandas as pd
 import mplfinance as mplf
+from matplotlib import pyplot as plt
 from scipy import stats
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
 from pyti.bollinger_bands import middle_bollinger_band as bb_mid
@@ -254,7 +255,7 @@ class CandlestickPlot(object):
         )
         plots.extend([fr_high_plot, fr_low_plot])
 
-    def show_candelstick_plot(self, step='1D'):
+    def get_candlestick_chart(self, step='1D'):
         self.add_rsi_plot(panel=0)
         self.add_line_plots(panel=1)
         self.add_bb_plots(period=20, panel=1)
@@ -263,7 +264,7 @@ class CandlestickPlot(object):
         self.add_vol_plots(vol_panel=3)
         custom_nc = self.get_nc_style()
         data_mpl = self.data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']]
-        mplf.plot(
+        fig, axlist = mplf.plot(
             data_mpl,
             type='candle',
             main_panel=1,
@@ -277,15 +278,17 @@ class CandlestickPlot(object):
             xrotation=7.5,
             tight_layout=True,
             # show_nontrading=True,
-            # returnfig=True
+            returnfig=True
         )
 
-        return
+        return fig
 
     def show_plot(self, xtick_count=120, resample=False, step='1D'):
         self.process_data_mpl(resample=resample, step=step)
         self.data = self.data[-xtick_count:]
         if not resample:
             step = '1D'
-        self.show_candelstick_plot(step=step)
+        fig = self.get_candlestick_chart(step=step)
+        plt.show()
+
 
