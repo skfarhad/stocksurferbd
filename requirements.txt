@@ -8,3 +8,5 @@ pyti==0.2.2
 tapy==1.9.1
 jupyter
 jupyterthemes
+wheel
+twine

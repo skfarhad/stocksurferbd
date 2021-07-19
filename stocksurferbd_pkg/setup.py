@@ -4,8 +4,8 @@ with open("../README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="dse-data-loader",
-    version="0.0.4",
+    name="stocksurferbd",
+    version="0.0.10",
     author="Sk Farhad",
     author_email="sk.farhad.eee@gmail.com",
     description="This is a tool to download stock market data of Dhaka Stock Exchange.",
@@ -32,7 +32,7 @@ setuptools.setup(
     ],
     # package_dir={"": "src"},
     # packages=setuptools.find_packages(where="dse_data_loader"),
-    packages=['src'],
+    packages=['stocksurferbd'],
     python_requires=">=3.6",
     zip_safe=False
 )

@@ -15,7 +15,7 @@ pip install dse-data-loader
 #### Downloading historical price data of a single stock-
 
 ```python
-from dse_data_loader import PriceData
+from stocksurferbd import PriceData
 loader = PriceData()
 
 loader.save_history_csv('ACI', file_name='ACI_history.csv')
@@ -27,7 +27,7 @@ It'll contain historical price data for ACI Limited. 'ACI' is the stock symbol.
 
 #### Downloading current price data of all listed companies in DSE-
 ```python
-from dse_data_loader import PriceData
+from stocksurferbd import PriceData
 loader = PriceData()
 
 loader.save_current_csv(file_name='current_data.csv')
@@ -38,7 +38,7 @@ It'll contain current price data for all symbols.
 #### Downloading fundamental data for a list of companies available in DSE-
 
 ```python
-from dse_data_loader import FundamentalData
+from stocksurferbd import FundamentalData
 loader = FundamentalData()
 
 loader.save_company_data(['ACI', 'GP', 'WALTONHIL'], path='company_info')
@@ -56,7 +56,7 @@ according to [DSE website](http://dsebd.org).
 
 ```python
 
-from dse_data_loader import CandlestickPlot
+from stocksurferbd import CandlestickPlot
 
 cd_plot = CandlestickPlot(csv_path='ACI_history.csv', symbol='ACI')
 cd_plot.show_plot(
@@ -79,7 +79,7 @@ Stock broker trading panels. There are 3 parameters-
 
 The following are some example images of Candlestick plots-
 
-![Candlestick Plot](https://github.com/skfarhad/algo-trading/blob/master/dse_data_loader_pkg/example_plot.jpg?raw=true)
-<br><br>![Candlestick Plot 3days](https://github.com/skfarhad/algo-trading/blob/master/dse_data_loader_pkg/example_plot_3D.jpg?raw=true)
+![Candlestick Plot](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot.jpg?raw=true)
+<br><br>![Candlestick Plot 3days](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot_3D.jpg?raw=true)
 
 This is the minimal documentation. It'll be improved continuously (hopefully!). 

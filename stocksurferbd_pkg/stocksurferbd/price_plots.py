@@ -255,7 +255,7 @@ class CandlestickPlot(object):
         )
         plots.extend([fr_high_plot, fr_low_plot])
 
-    def get_candlestick_chart(self, step='1D'):
+    def create_candlestick_chart(self, step='1D'):
         self.add_rsi_plot(panel=0)
         self.add_line_plots(panel=1)
         self.add_bb_plots(period=20, panel=1)
@@ -281,14 +281,21 @@ class CandlestickPlot(object):
             returnfig=True
         )
 
-        return fig
+        return fig, axlist
 
     def show_plot(self, xtick_count=120, resample=False, step='1D'):
         self.process_data_mpl(resample=resample, step=step)
         self.data = self.data[-xtick_count:]
         if not resample:
             step = '1D'
-        fig = self.get_candlestick_chart(step=step)
+        fig, axlist = self.create_candlestick_chart(step=step)
         plt.show()
 
+    def get_candlestick_fig(self, xtick_count=120, resample=False, step='1D'):
+        self.process_data_mpl(resample=resample, step=step)
+        self.data = self.data[-xtick_count:]
+        if not resample:
+            step = '1D'
+        fig, axlist = self.create_candlestick_chart(step=step)
+        return fig, axlist
 

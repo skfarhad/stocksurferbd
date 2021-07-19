@@ -15,9 +15,10 @@ from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
 from pyti.relative_strength_index import relative_strength_index as pyti_rsi
 from tapy import Indicators
-HISTORY_FOLDER = 'dse_history_data'
+# from stocksurferbd import CandlestickPlot, PriceData
 
-from stocksurferbd_pkg import CandlestickPlot
+
+HISTORY_FOLDER = 'dse_history_data'
 
 
 def clean_x(x):
