@@ -1,10 +1,12 @@
 ## Description
 This is a Python library based on *beautifulsoup4*, *pandas* &
-*mplfinance* to download price data and fundamental data of companies from  
+*mplfinance*.
+<br> You may use it to download price history and fundamental information of companies from 
 Dhaka Stock Exchange.
-<br/>This can assist you to create further analyses 
+<br>This can assist you to create further analyses 
 based on fundamental and price history data. 
-<br/>Also create Candlestick charts to analyse price history of stocks using a simple wrapper for mplfinance.
+<br>Also create Candlestick charts to analyse the price history of stocks using 
+this easy-to-use wrapper for mplfinance.
 ## Installation
 ```
 pip install stocksurferbd
@@ -25,7 +27,7 @@ The above code will create a file named- 'ACI_history.csv'.
 It'll contain historical price data for ACI Limited. 'ACI' is the stock symbol.
 
 
-#### Downloading current price data of all listed companies in DSE-
+#### Downloading current market price data of all listed companies in DSE-
 ```python
 from stocksurferbd import PriceData
 loader = PriceData()
