@@ -7,7 +7,7 @@ based on fundamental and price history data.
 <br/>Also create Candlestick charts to analyse price history of stocks using a simple wrapper for mplfinance.
 ## Installation
 ```
-pip install dse-data-loader
+pip install stocksurferbd
 
 ```
 ## Usage
