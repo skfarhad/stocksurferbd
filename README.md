@@ -84,4 +84,9 @@ The following are some example images of Candlestick plots-
 ![Candlestick Plot](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot.jpg?raw=true)
 <br><br>![Candlestick Plot 3days](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot_3D.jpg?raw=true)
 
-This is the minimal documentation. It'll be improved continuously (hopefully!). 
+
+
+## If you want to contribute
+
+Any contribution would be highly appreciated. Kindly go through the 
+[guidelines for contributing](CONTRIBUTING.md).

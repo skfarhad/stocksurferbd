@@ -17,11 +17,10 @@ Pull requests are the best way to propose changes to the codebase. I will be act
 - Issue that pull request!
 
 
-## Report bugs using Github's [issues](https://github.com/skfarhad/stocksurferbd/issues)
-Let's use GitHub issues to track public bugs. Report a bug by [opening a new issue](); it's that easy!
+## Reporting bugs
+Let's use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/skfarhad/stocksurferbd/issues).
 
-## Write bug reports with detailed summery and sample code
-**Great Bug Reports** tend to have:
+#### Write bug reports with detailed summery and sample code. Great bug reports tend to have-
 
 - A quick summary and/or background
 - Steps to reproduce
@@ -40,10 +39,15 @@ People *love* thorough bug reports. I'm not even kidding.
 * Don't use more than 80 characters in a single line of code
 * Use descriptive variable names
 
+
+## Feature requests
+Feature requests are highly appreciated. I would love to hear about how you might use this tool in your professional/research work.
+<b>  [The project issue tracker](https://github.com/skfarhad/stocksurferbd/issues) can be used for feature requests also.
+
+- Provide the specific use cases of the requested features in details
+- You may also suggest slight enhancements of existing features
+- Mention how these features add value to your profession/research work
+
 ## License
 By contributing, you agree that your contributions will be licensed under its MIT License. 
 In short, when you submit code changes, your submissions are understood to be under the same [MIT License](http://choosealicense.com/licenses/mit/) that covers the project. Feel free to contact the maintainers if that's a concern.
-
-## Acknowledgements
-This document is created by modifying this [gist](https://gist.github.com/briandk/3d2e8b3ec8daf5a27a62). 
-Special thanks to [briandk](https://github.com/briandk)!
