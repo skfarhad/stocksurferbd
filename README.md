@@ -20,22 +20,36 @@ pip install stocksurferbd
 from stocksurferbd import PriceData
 loader = PriceData()
 
-loader.save_history_csv('ACI', file_name='ACI_history.csv')
+loader.save_history_csv(symbol='ACI', file_name='ACI_history.csv', market='DSE')
 ```
 
 The above code will create a file named- 'ACI_history.csv'. 
-It'll contain historical price data for ACI Limited. 'ACI' is the stock symbol.
+It'll contain historical price data for ACI Limited in Dhaka Stock Exchange (DSE).
 
 
-#### Downloading current market price data of all listed companies in DSE-
+There are 3 parameters for this method-
+
+1. ```symbol``` : Provide stock symbol of the company as string.
+2. ```file_name``` : Provide the name of the history data file as string. 
+3. ```market```: Provide the market name as string from which you want to download the data. 
+Probable values are ```'CSE'``` and ```'DSE'```
+
+
+#### Downloading current market price data of all listed companies in DSE/CSE-
 ```python
 from stocksurferbd import PriceData
 loader = PriceData()
 
-loader.save_current_csv(file_name='current_data.csv')
+loader.save_current_csv(file_name='current_data.csv', market='DSE')
 ```
 The above code will create a file named- 'ACI_history.csv' in the current folder. 
 It'll contain current price data for all symbols.
+
+There are 2 parameters for this method-
+
+1. ```file_name``` : Provide the name of the current price data file as string. 
+2. ```market```: Provide the market name as string from which you want to download the data. 
+Probable values ar ```'CSE'``` and ```'DSE'```
 
 #### Downloading fundamental data for a list of companies available in DSE-
 
@@ -69,7 +83,14 @@ cd_plot.show_plot(
 ```
 
 The above code will create a Candlestick plot like the ones provided by 
-Stock broker trading panels. There are 3 parameters-
+Stock broker trading panels. 
+
+<br/>There are 2 parameters ```__init__()``` method of CandlestickPlot class-
+
+1. ```csv_path``` : Provide the path of history csv file as string to generate plot
+2. ```symbol``` : Provide stock symbol of the company as string.
+
+<br/>There are also 3 parameters show_plot() method-
 
 1. ```xtick_count``` : Provide an integer value. 
    It sets the count of how many recent data points needs to be plotted.

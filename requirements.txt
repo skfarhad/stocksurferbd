@@ -10,3 +10,4 @@ jupyter
 jupyterthemes
 wheel
 twine
+pynamodb

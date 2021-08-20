@@ -4,6 +4,7 @@ __author__ = "Sk Farhad"
 __copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 
 import os
+import sys
 import pandas as pd
 
 from stocksurferbd_pkg import PriceData
@@ -87,7 +88,16 @@ def append_all_stock_data():
     print('Data extraction finished')
 
 
-fetch_all_stock_data()
-# append_all_stock_data()
-# loader.save_history_csv('KAY&QUE', file_name='KAY&QUE.csv')
-# loader.save_current_csv()
+def main(args):
+    if args[0] == 'history_all':
+        fetch_all_stock_data()
+    elif args[0] == 'history_append':
+        append_all_stock_data()
+    else:
+        # loader.save_history_csv('KAY&QUE', file_name='KAY&QUE.csv')
+        loader.save_current_csv()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+

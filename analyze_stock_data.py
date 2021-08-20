@@ -7,7 +7,6 @@ import os
 import numpy as np
 import pandas as pd
 import mplfinance as mplf
-# from matplotlib.ticker import MultipleLocator
 from matplotlib import pyplot as plt
 from scipy import stats
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
@@ -15,10 +14,6 @@ from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
 from pyti.relative_strength_index import relative_strength_index as pyti_rsi
 from tapy import Indicators
-# from stocksurferbd import CandlestickPlot, PriceData
-
-
-HISTORY_FOLDER = 'dse_history_data'
 
 
 def clean_x(x):
@@ -34,7 +29,7 @@ def clean_x(x):
 
 
 def get_n_short(data_len):
-    return data_len//4
+    return data_len // 6
 
 
 def get_crossing(y_val, kpi_data):
@@ -83,7 +78,7 @@ def get_macd(data, n_fast=10, n_slow=22, n_smooth=7):
     return macd, macd_sig, macd_hist
 
 
-def process_data_mpl(file_path='', resample=False, step='3D'):
+def process_data_mpl(file_path='', resample=False, step='3D', vol_key='VOLUME'):
     df = pd.read_csv(
         file_path,
         sep=r'\s*,\s*',
@@ -92,13 +87,13 @@ def process_data_mpl(file_path='', resample=False, step='3D'):
         engine='python',
     )
     # print(df.head())
-    columns = ['DATE', 'CLOSEP', 'VALUE_MN', 'HIGH', 'LOW', 'OPENP', 'TRADE']
+    columns = ['DATE', 'CLOSEP', vol_key, 'HIGH', 'LOW', 'OPENP', 'TRADE']
     df = df[columns]
     df = df.rename(columns={
         'DATE': 'Date',
         'OPENP': 'Open',
         'CLOSEP': 'Close',
-        'VALUE_MN': 'Volume',
+        vol_key: 'Volume',
         'TRADE': 'Trade',
         'HIGH': 'High',
         'LOW': 'Low'
@@ -124,13 +119,20 @@ def process_data_mpl(file_path='', resample=False, step='3D'):
     return df
 
 
-def aggregate_history_data(symbols, categories, data_n=90, resample=False, step='3D'):
-    path = HISTORY_FOLDER
+def aggregate_history_data(
+        path,
+        symbols,
+        categories,
+        data_n=90,
+        resample=False,
+        step='3D',
+        vol_key='VOLUME'
+):
     df = pd.DataFrame()
     for symbol, cat in zip(symbols, categories):
         full_path = os.path.join(path, symbol + '_history_data.csv')
         try:
-            data_df = process_data_mpl(full_path, resample=resample, step=step)
+            data_df = process_data_mpl(full_path, vol_key=vol_key, resample=resample, step=step)
             data_df = data_df[-data_n:]
             n_short = get_n_short(data_n)
             n_long = (data_n - n_short)
@@ -174,12 +176,24 @@ def aggregate_history_data(symbols, categories, data_n=90, resample=False, step=
     return df
 
 
-def show_pnl(symbol, data, n_short, purchased_at, category='A'):
-    ltp = data['Close'][-1:].values[0]
-    max_p = max(data['Close'][-n_short:].values)
-    gain = ((max_p - ltp) / ltp) * 100
-    min_p = min(data['Close'][-n_short:].values)
-    loss = ((ltp - min_p) / ltp) * 100
+def show_pnl(symbol, data, purchased_at, category='A'):
+    n_short = get_n_short(len(data))
+    data_short = data['Close'][-n_short:]
+    ltp = data_short.values[-1]
+    x_tr = range(0, n_short)
+    slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
+    y_tr = (slope * x_tr) + y_tr
+    yn = y_tr[-1]
+    diffs = data_short - y_tr
+    p_diff = [diff for diff in diffs if diff > 0]
+    n_diff = [abs(diff) for diff in diffs if diff < 0]
+
+    # print(round(max(p_diff), 2), round(max(n_diff), 2), round(yn, 2))
+
+    gain = ((max(p_diff) - (ltp - yn)) / ltp) * 100
+    loss = ((max(n_diff) - (yn - ltp)) / ltp) * 100
+    # gain = (max(p_diff) / ltp) * 100
+    # loss = (max(n_diff) / ltp) * 100
     print('-----------------------------------------------------')
     print('Symbol: ' + symbol + "(c)".replace('c', category) + ', LTP: ' + str(ltp) +
           ', ' + str(n_short) + ' days max % up/down: ' +
@@ -263,17 +277,17 @@ def add_line_plots(plots, data, purchased_at=False, panel=0):
     data_short = data['Close'][-n_short:]
     x_tr = range(0, len(data_short))
     slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
-    y_tr_value = slope * x_tr + y_tr
+    y_tr_long = slope * x_tr + y_tr
     y_tr_value = np.concatenate((
-        [np.NaN] * (data_n - n_short), y_tr_value
+        [np.NaN] * (data_n - n_short), y_tr_long
     ))
 
     data_long = data['Close'][: (data_n - n_short)]
     x_tr2 = range(0, len(data_long))
     slope2, y_tr2, r_val, p_val, std_err = stats.linregress(x_tr2, data_long)
-    y_tr_value2 = slope2 * x_tr2 + y_tr2
+    y_tr_short = slope2 * x_tr2 + y_tr2
     y_tr_value2 = np.concatenate((
-        y_tr_value2, [np.NaN] * n_short
+        y_tr_short, [np.NaN] * n_short
     ))
 
     y_tr_plot = mplf.make_addplot(
@@ -313,7 +327,7 @@ def add_vol_plots(plots, data, color_up, color_down, vol_panel=2):
         panel=vol_panel,
         color=vol_colors.values,
         type='bar',
-        ylabel='Value(Mil)',
+        ylabel='Volume',
     )
     plots.append(volume_plot)
 
@@ -340,8 +354,7 @@ def add_fractal_plot(plots, data, color_up, color_down, panel=0):
 
 
 def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
-    n_short = get_n_short(len(data))
-    show_pnl(symbol, data, n_short, purchased_at, category)
+    show_pnl(symbol, data, purchased_at, category)
     color_up = 'limegreen'
     color_down = 'tomato'
     plots = []
@@ -361,14 +374,15 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
     add_vol_plots(plots, data, color_up, color_down, vol_panel=3)
     custom_nc = mplf.make_mpf_style(
         base_mpf_style='nightclouds',
-        marketcolors={'candle': {'up': color_up, 'down': color_down},
-                      'edge': {'up': color_up, 'down': color_down},
-                      'wick': {'up': color_up, 'down': color_down},
-                      'ohlc': {'up': color_up, 'down': color_down},
-                      'volume': {'up': color_up, 'down': color_down},
-                      'vcdopcod': True,  # Volume Color Depends On Price Change On Day
-                      'alpha': 1.0,
-                      },
+        marketcolors={
+            'candle': {'up': color_up, 'down': color_down},
+            'edge': {'up': color_up, 'down': color_down},
+            'wick': {'up': color_up, 'down': color_down},
+            'ohlc': {'up': color_up, 'down': color_down},
+            'volume': {'up': color_up, 'down': color_down},
+            'vcdopcod': True,  # Volume Color Depends On Price Change On Day
+            'alpha': 1.0,
+        },
         mavcolors=['gray', 'sienna', 'darkslategray', 'purple'],
     )
     data_mpl = data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']]
@@ -377,7 +391,7 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
         type='candle',
         main_panel=1,
         style=custom_nc,
-        title=symbol + ': ' + step ,
+        title=symbol + ': ' + step,
         ylabel='Price (Tk)',
         figratio=(18, 8),
         addplot=plots,
@@ -392,10 +406,15 @@ def candelstick_plot(symbol, data, category='A', purchased_at=False, step='1D'):
 
 
 def visualize_candlestick_data(
-    symbol, category='A', data_n=120, resample=False, step='3D'
+        history_path,
+        symbol,
+        category='A',
+        data_n=120,
+        resample=False,
+        step='3D'
 ):
     try:
-        path = os.path.join(HISTORY_FOLDER, symbol + '_history_data.csv')
+        path = os.path.join(history_path, symbol + '_history_data.csv')
         data = process_data_mpl(path, resample=resample, step=step)
         data = data[-data_n:]
         if not resample:
@@ -407,20 +426,31 @@ def visualize_candlestick_data(
 
 
 def visualize_candlestick_data_list(
-        symbols, categories, data_n=120, resample=False, step='3D'
+        history_path,
+        symbols,
+        categories,
+        data_n=120,
+        resample=False,
+        step='3D'
 ):
     for symbol, cat in zip(symbols, categories):
         if not resample:
             step = '1D'
         visualize_candlestick_data(
-            symbol, cat, data_n=data_n, resample=resample, step=step
+            history_path, symbol, cat, data_n=data_n, resample=resample, step=step
         )
 
 
-def visualize_candlestick_data_with_price(sym_w_prices, data_n=120, resample=False, step='3D'):
+def visualize_candlestick_data_with_price(
+        history_path,
+        sym_w_prices,
+        data_n=120,
+        resample=False,
+        step='3D'
+):
     for sym_p in sym_w_prices:
         try:
-            path = os.path.join(HISTORY_FOLDER, sym_p[0] + '_history_data.csv')
+            path = os.path.join(history_path, sym_p[0] + '_history_data.csv')
             data = process_data_mpl(path, resample=resample, step=step)
             data = data[-data_n:]
             if not resample:
@@ -430,11 +460,8 @@ def visualize_candlestick_data_with_price(sym_w_prices, data_n=120, resample=Fal
         except Exception as e:
             print(str(e))
 
-
 # path = os.path.join(HISTORY_FOLDER, 'ACI_history_data.csv')
 # cd_plot = CandlestickPlot(csv_path=path, symbol='ACI')
 # cd_plot.show_plot(xtick_count=120, resample=True, step='3D')
 
 # jt -t monokai -f fira -fs 11 -nf ptsans -nfs 10 -N -kl -cursw 3 -cursc g -cellw 85% -T
-
-

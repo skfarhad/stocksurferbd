@@ -10,15 +10,19 @@
 *.ipynb
 *.gz
 *.p
+*.pdf
+*.xls
 
 
-chromedriver_linux64/
+
 venv/
 env/
 __pycache__/
 ta-lib/
 company_info/
-dse_history_data/
+*_history_data/
+*_base_data/
 *.egg-info/
-stocksurferbd_pkg/build/
-stocksurferbd_pkg/dist/
+*/build/
+*/dist/
+*_linux64/

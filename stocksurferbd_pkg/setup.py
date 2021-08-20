@@ -5,7 +5,7 @@ with open("../README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="stocksurferbd",
-    version="0.0.11",
+    version="0.0.12",
     author="Sk Farhad",
     author_email="sk.farhad.eee@gmail.com",
     description="This is a tool to download stock market data of Dhaka Stock Exchange.",

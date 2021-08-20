@@ -72,7 +72,7 @@ class CandlestickPlot(object):
         )
         return ncs
 
-    def process_data_mpl(self, resample=False, step='3D'):
+    def process_data_mpl(self, resample=False, step='3D', vol_key='VOLUME'):
         df = pd.read_csv(
             self.csv_path,
             sep=r'\s*,\s*',
@@ -81,13 +81,13 @@ class CandlestickPlot(object):
             engine='python',
         )
         # print(df.head())
-        columns = ['DATE', 'CLOSEP', 'VALUE_MN', 'HIGH', 'LOW', 'OPENP', 'TRADE']
+        columns = ['DATE', 'CLOSEP', vol_key, 'HIGH', 'LOW', 'OPENP', 'TRADE']
         df = df[columns]
         df = df.rename(columns={
             'DATE': 'Date',
             'OPENP': 'Open',
             'CLOSEP': 'Close',
-            'VALUE_MN': 'Volume',
+            vol_key: 'Volume',
             'TRADE': 'Trade',
             'HIGH': 'High',
             'LOW': 'Low'
@@ -229,7 +229,7 @@ class CandlestickPlot(object):
             panel=vol_panel,
             color=vol_colors.values,
             type='bar',
-            ylabel='Value(Mil)',
+            ylabel='Volume',
         )
         plots.append(volume_plot)
 
