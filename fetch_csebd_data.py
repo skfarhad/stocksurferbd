@@ -31,4 +31,5 @@ def fetch_all_stock_data():
     print('Data extraction finished')
 
 
-fetch_all_stock_data()
+if __name__ == "__main__":
+    fetch_all_stock_data()
