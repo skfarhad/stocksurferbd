@@ -2,7 +2,7 @@
 This is a Python library based on *beautifulsoup4*, *pandas* &
 *mplfinance*.
 <br> You may use it to download price history and fundamental information of companies from 
-Dhaka Stock Exchange.
+Dhaka Stock Exchange and Chittagong Stock Exchange.
 <br>This can assist you to create further analyses 
 based on fundamental and price history data. 
 <br>Also create Candlestick charts to analyse the price history of stocks using 
@@ -23,7 +23,7 @@ loader = PriceData()
 loader.save_history_csv(symbol='ACI', file_name='ACI_history.csv', market='DSE')
 ```
 
-The above code will create a file named- 'ACI_history.csv'. 
+The above code will create a file named- `ACI_history.csv`. 
 It'll contain historical price data for ACI Limited in Dhaka Stock Exchange (DSE).
 
 
@@ -42,7 +42,7 @@ loader = PriceData()
 
 loader.save_current_csv(file_name='current_data.csv', market='DSE')
 ```
-The above code will create a file named- 'ACI_history.csv' in the current folder. 
+The above code will create a file named- `current_history.csv` in the current folder. 
 It'll contain current price data for all symbols.
 
 There are 2 parameters for this method-
@@ -57,16 +57,19 @@ Probable values ar ```'CSE'``` and ```'DSE'```
 from stocksurferbd import FundamentalData
 loader = FundamentalData()
 
-loader.save_company_data(['ACI', 'GP', 'WALTONHIL'], path='company_info')
+loader.save_company_data('ACI', path='company_info')
 
 ```
-The above code will create two files named 'company_data.csv' & 
-'financial_data.csv' in the 'company_info' folder relative to 
-current directory. The file named company_data.csv contains 
-the fundamental data of ACI Limited, GP and Walton BD for the current year and
-financial_data.csv contains year-wise fundamental data 
-according to [DSE website](http://dsebd.org).
+The above code will create two files named `ACI_company_data.csv` & 
+`ACI_financial_data.csv` in the `company_info` folder relative to 
+current directory. The file named `ACI_company_data.csv` contains 
+the fundamental data of ACI Limited for the current year and
+`ACI_financial_data.csv` contains year-wise fundamental data according to [DSE website](http://dsebd.org).
 
+There are 2 parameters `save_company_data()` this method-
+
+1. ```symbol``` : Provide stock symbol of the company as string.
+2. ```path``` : Provide the name of the directory as string to save the company data. 
 
 #### Create Candlestick charts for analyzing price history-
 
