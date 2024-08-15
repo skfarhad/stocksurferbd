@@ -8,10 +8,10 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 from dateutil import parser
-
+import json
 
 class FundamentalData(object):
-    DSE_COMPANY_URL = "http://dsebd.org/displayCompany.php?name="
+    DSE_COMPANY_URL = "https://dsebd.org/displayCompany.php?name="
     CURRENT_PRICE_URL = 'https://www.dsebd.org/dseX_share.php'
 
     @staticmethod
@@ -29,7 +29,7 @@ class FundamentalData(object):
         return int(new_val)
 
     @staticmethod
-    def append_company(company_info, fin_interim_info, df_company, symbol):
+    def append_company(company_info, fin_interim_info, symbol):
         company_dict = {
             'symbol': symbol,
             'auth_capital': company_info['basic'][0][0],
@@ -50,58 +50,57 @@ class FundamentalData(object):
             # 'present_st_loan',
             # 'present_lt_loan',
             'cash_dividend_p': company_info['dividend'][0][0].split(',')[0].split('%')[0] \
-                if len(company_info['dividend'][0][0]) > 6 else '-',
+                if '%' in company_info['dividend'][0][0] else '-',
             'cash_dividend_year': company_info['dividend'][0][0].split(',')[0].split('%')[1] \
-                if len(company_info['dividend'][0][0]) > 6 else '-',
-            # 'stock_dividend_p': company_info['dividend'][1][0].split(',')[0].split('%')[0] \
-            #     if len(company_info['dividend'][1][0]) > 6 else '-',
-            # 'stock_dividend_year': company_info['dividend'][1][0].split(',')[0].split('%')[1] \
-            #     if len(company_info['dividend'][1][0]) > 6 else '-',
+                if '%' in company_info['dividend'][0][0] else '-',
+            'stock_dividend_p': company_info['dividend'][1][0].split(',')[0].split('%')[0] \
+                if '%' in company_info['dividend'][1][0] else '-',
+            'stock_dividend_year': company_info['dividend'][1][0].split(',')[0].split('%')[1] \
+                if '%' in company_info['dividend'][1][0] else '-',
             'listing_year': company_info['other'][0][1],
             'market_category': company_info['other'][1][1],
-            'sh_director': company_info['other'][3][1].split(' ')[0].split(':')[1],
-            'sh_govt': company_info['other'][3][1].split(' ')[1].split(':')[1],
-            'sh_inst': company_info['other'][3][1].split(' ')[2].split(':')[1],
-            'sh_foreign': company_info['other'][3][1].split(' ')[3].split(':')[1],
-            'sh_public': company_info['other'][3][1].split(' ')[4].split(':')[1],
+            'sh_director': company_info['other'][4][0].split(': ')[1],
+            'sh_govt': company_info['other'][4][1].split(': ')[1],
+            'sh_inst': company_info['other'][4][2].split(': ')[1],
+            'sh_foreign': company_info['other'][4][3].split(': ')[1],
+            'sh_public': company_info['other'][4][4].split(': ')[1],
 
-            'turnover_q1': fin_interim_info['main'][4][1],
-            'turnover_q2': fin_interim_info['main'][4][2],
-            'turnover_q3': fin_interim_info['main'][4][4],
-            'profit_cop_q1': fin_interim_info['main'][5][1],
-            'profit_cop_q2': fin_interim_info['main'][5][2],
-            'profit_cop_q3': fin_interim_info['main'][5][4],
-            'profit_period_q1': fin_interim_info['main'][6][1],
-            'profit_period_q2': fin_interim_info['main'][6][2],
-            'profit_period_q3': fin_interim_info['main'][6][4],
-            'tci_period_q1': fin_interim_info['main'][7][1],
-            'tci_period_q2': fin_interim_info['main'][7][2],
-            'tci_period_q3': fin_interim_info['main'][7][4],
-            'eps_basic_q1': fin_interim_info['main'][9][1],
-            'eps_basic_q2': fin_interim_info['main'][9][2],
-            'eps_basic_q3': fin_interim_info['main'][9][4],
-            'eps_diluted_q1': fin_interim_info['main'][10][1],
-            'eps_diluted_q2': fin_interim_info['main'][10][2],
-            'eps_diluted_q3': fin_interim_info['main'][10][4],
-            'eps_cop_basic_q1': fin_interim_info['main'][12][1],
-            'eps_cop_basic_q2': fin_interim_info['main'][12][2],
-            'eps_cop_basic_q3': fin_interim_info['main'][12][4],
-            'eps_cop_diluted_q1': fin_interim_info['main'][13][1],
-            'eps_cop_diluted_q2': fin_interim_info['main'][13][2],
-            'eps_cop_diluted_q3': fin_interim_info['main'][13][4],
-            'price_period_q1': fin_interim_info['main'][14][1],
-            'price_period_q2': fin_interim_info['main'][14][2],
-            'price_period_q3': fin_interim_info['main'][14][4],
+            'eps_basic_q1': fin_interim_info['main'][5][1],
+            'eps_basic_q2': fin_interim_info['main'][5][2],
+            'eps_basic_hy': fin_interim_info['main'][5][3],
+            'eps_basic_q3': fin_interim_info['main'][5][4],
+            'eps_basic_9m': fin_interim_info['main'][5][5],
+            'eps_basic_yr': fin_interim_info['main'][5][6],
+
+            'eps_diluted_q1': fin_interim_info['main'][6][1],
+            'eps_diluted_q2': fin_interim_info['main'][6][2],
+            'eps_diluted_hy': fin_interim_info['main'][6][3],
+            'eps_diluted_q3': fin_interim_info['main'][6][4],
+            'eps_diluted_9m': fin_interim_info['main'][6][5],
+            'eps_diluted_yr': fin_interim_info['main'][6][6],
+
+
+            'eps_cop_basic_q1': fin_interim_info['main'][8][1],
+            'eps_cop_basic_q2': fin_interim_info['main'][8][2],
+            'eps_cop_basic_hy': fin_interim_info['main'][8][3],
+            'eps_cop_basic_q3': fin_interim_info['main'][8][4],
+            'eps_cop_basic_9m': fin_interim_info['main'][8][5],
+            'eps_cop_basic_yr': fin_interim_info['main'][8][6],
+
+            'eps_cop_diluted_q1': fin_interim_info['main'][9][1],
+            'eps_cop_diluted_q2': fin_interim_info['main'][9][2],
+            'eps_cop_diluted_hy': fin_interim_info['main'][9][3],
+            'eps_cop_diluted_q3': fin_interim_info['main'][9][4],
+            'eps_cop_diluted_9m': fin_interim_info['main'][9][5],
+            'eps_cop_diluted_yr': fin_interim_info['main'][9][6],
         }
-        try:
-            df_company = df_company.append(company_dict, ignore_index=True)
-        except Exception as e:
-            print(str(e))
+        df_company = pd.DataFrame(company_dict, index=[0])
 
         return df_company
 
     @staticmethod
-    def append_fin_perf(fin_perf_info, df_fin_perf, symbol):
+    def append_fin_perf(fin_perf_info, symbol):
+        data_list = []
         for eps, pe in zip(fin_perf_info['eps'][3:], fin_perf_info['pe'][4:]):
             i = 0
             if len(eps) > 13:
@@ -134,10 +133,33 @@ class FundamentalData(object):
                 'dividend_yield_p': pe[i + 8]
             }
             # print(eps_dict['year'])
-            try:
-                df_fin_perf = df_fin_perf.append(eps_dict, ignore_index=True)
-            except Exception as e:
-                print(str(e))
+            data_list.append(eps_dict)
+        df_fin_perf = pd.DataFrame(
+            data_list,
+            columns=[
+                'symbol', 'year',
+                'eps_original',
+                'eps_restated',
+                'eps_diluted',
+                'eps_cop_original',
+                'eps_cop_restated',
+                'eps_cop_diluted',
+                'nav_original',
+                'nav_restated',
+                'nav_diluted',
+                'pco',
+                'profit',
+                'tci',
+                'pe_original',
+                'pe_restated',
+                'pe_diluted',
+                'pe_cop_original',
+                'pe_cop_restated',
+                'pe_cop_diluted',
+                'dividend_p',
+                'dividend_yield_p'
+            ]
+        )
 
         return df_fin_perf
 
@@ -153,9 +175,15 @@ class FundamentalData(object):
                 "class": "col-sm-6 pull-left"
             }
         )
-        # print(agm_info.text)
+        if agm_info is None:
+            raise Exception(f"Data fetch error for: {symbol}")
+        # print("AGM info: " + str(agm_info))
         date_txt = " ".join(agm_info.text.split('on:')[1].strip().split())
-        last_agm_date = parser.parse(date_txt).date()
+        try:
+            last_agm_date = parser.parse(date_txt).date()
+        except Exception as e:
+            print(str(e))
+            last_agm_date = 'None'
 
         company_tables = soup.find_all(
             "table",
@@ -196,6 +224,9 @@ class FundamentalData(object):
                 })
 
             elif count == 4:
+                # print('fin interim main: ')
+                for item in cur_list:
+                    print(item)
                 fin_interim_info.update({
                     'main': cur_list
                 })
@@ -235,40 +266,32 @@ class FundamentalData(object):
 
         return dict_company, dict_fin_perf
 
-    def get_company_df(
-        self, symbols,
-        df_company=pd.DataFrame(),
-        df_fin_perf=pd.DataFrame()
-    ):
-        if type(symbols) is not list:
-            raise TypeError("Either list or tuple is allowed for 'symbols' parameter!")
-        for symbol in symbols:
-            full_url = self.DSE_COMPANY_URL + symbol
-            target_page = requests.get(full_url)
-            page_html = BeautifulSoup(target_page.text, 'html.parser')
-            dict_company, dict_fin_perf = self.parse_company_data_rows(
-                page_html, symbol
-            )
-            print("Fetching data for: ", symbol)
-            df_company = self.append_company(
-                company_info=dict_company['company_info'],
-                fin_interim_info=dict_company['fin_interim_info'],
-                df_company=df_company,
-                symbol=symbol
-            )
-            df_fin_perf = self.append_fin_perf(
-                fin_perf_info=dict_fin_perf['fin_perf_info'],
-                df_fin_perf=df_fin_perf,
-                symbol=symbol
-            )
-            print("Fetch complete!")
-        return df_company, df_fin_perf
+    def get_company_df(self, symbol):
+        df_company_all = pd.DataFrame()
+        df_fin_perf_all = pd.DataFrame()
+        full_url = self.DSE_COMPANY_URL + symbol
+        # print("URL: " + full_url)
+        target_page = requests.get(full_url)
+        page_html = BeautifulSoup(target_page.text, 'html.parser')
+        dict_company, dict_fin_perf = self.parse_company_data_rows(
+            page_html, symbol
+        )
+        print("Fetching data for: ", symbol)
+        df_company = self.append_company(
+            company_info=dict_company['company_info'],
+            fin_interim_info=dict_company['fin_interim_info'],
+            symbol=symbol
+        )
+        df_company_all = pd.concat([df_company_all, df_company])
+        df_fin_perf = self.append_fin_perf(
+            fin_perf_info=dict_fin_perf['fin_perf_info'],
+            symbol=symbol
+        )
+        df_fin_perf_all = pd.concat([df_fin_perf_all, df_fin_perf])
+        print("Fetch complete!")
+        return df_company_all, df_fin_perf_all
 
-    def save_company_data(self, symbols, path=''):
-        if type(symbols) is not list:
-            raise TypeError("Either list or tuple is allowed for 'symbols' parameter!")
-        company_df = pd.DataFrame()
-        fin_df = pd.DataFrame()
-        company_df, fin_df = self.get_company_df(symbols, company_df, fin_df)
-        company_df.to_csv(os.path.join(path, 'company_data.csv'), index=False)
-        fin_df.to_csv(os.path.join(path, 'financial_data.csv'), index=False)
+    def save_company_data(self, symbol, path=''):
+        company_df, fin_df = self.get_company_df(symbol)
+        company_df.to_csv(os.path.join(path, f'{symbol}_company_data.csv'), index=False)
+        fin_df.to_csv(os.path.join(path, f'{symbol}_financial_data.csv'), index=False)

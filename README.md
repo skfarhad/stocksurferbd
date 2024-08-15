@@ -102,8 +102,8 @@ Stock broker trading panels.
 
 The following are some example images of Candlestick plots-
 
-![Candlestick Plot](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot.jpg?raw=true)
-<br><br>![Candlestick Plot 3days](https://github.com/skfarhad/stocksurferbd/blob/master/example_plot_3D.jpg?raw=true)
+![Candlestick Plot](https://github.com/skfarhad/stocksurferbd/blob/master/price_plot_1d.png?raw=true)
+<br><br>![Candlestick Plot 3days](https://github.com/skfarhad/stocksurferbd/blob/master/price_plot_3d.png?raw=true)
 
 
 

@@ -11,12 +11,14 @@ loader = FundamentalData()
 
 def get_all_company_data():
     df = pd.read_csv('dsebd_current_data.csv')
-    symbols = list(df['TRADING_CODE'].values)
+    symbols = df['TRADING_CODE'].values.tolist()
     # print(symbols)
-    loader.save_company_data(symbols, path='company_info')
+    for symbol in symbols:
+        try:
+            loader.save_company_data(symbol, path='company_info')
+        except Exception as e:
+            print(str(e))
 
 
 get_all_company_data()
-# df_company, df_fin = loader.get_company_df(['ACI'])
-# print(df_company.head())
-# loader.save_company_data(['ACI'])
+# loader.save_company_data('ACI')

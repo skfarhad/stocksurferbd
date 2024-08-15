@@ -1,8 +1,7 @@
 requests==2.25.1
-pandas==1.2.3
-scipy==1.6.2
+pandas==2.2.2
 beautifulsoup4==4.9.3
-matplotlib==3.4.1
+matplotlib==3.9.2
 mplfinance==0.12.7a17
 pyti==0.2.2
 tapy==1.9.1

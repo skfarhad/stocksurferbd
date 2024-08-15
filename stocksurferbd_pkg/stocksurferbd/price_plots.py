@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import mplfinance as mplf
 from matplotlib import pyplot as plt
-from scipy import stats
 from pyti.bollinger_bands import upper_bollinger_band as bb_up
 from pyti.bollinger_bands import middle_bollinger_band as bb_mid
 from pyti.bollinger_bands import lower_bollinger_band as bb_low
@@ -179,44 +178,6 @@ class CandlestickPlot(object):
             line_os, line_rsi, line_ob
         ])
 
-    def add_line_plots(self, panel=0):
-        data, plots = self.data, self.plots
-        data_n = len(data)
-        n_short = self.get_n_short(data_n)
-        data_short = data['Close'][-n_short:]
-        x_tr = range(0, len(data_short))
-        slope, y_tr, r_val, p_val, std_err = stats.linregress(x_tr, data_short)
-        y_tr_value = slope * x_tr + y_tr
-        y_tr_value = np.concatenate((
-            [np.NaN] * (data_n - n_short), y_tr_value
-        ))
-
-        data_long = data['Close'][: (data_n - n_short)]
-        x_tr2 = range(0, len(data_long))
-        slope2, y_tr2, r_val, p_val, std_err = stats.linregress(x_tr2, data_long)
-        y_tr_value2 = slope2 * x_tr2 + y_tr2
-        y_tr_value2 = np.concatenate((
-            y_tr_value2, [np.NaN] * n_short
-        ))
-
-        y_tr_plot = mplf.make_addplot(
-            y_tr_value, panel=panel,
-            color='coral', width=2, alpha=0.4, linestyle='dashed'
-        )
-        price_plot = mplf.make_addplot(
-            data['Close'].rolling(window=5).mean(),
-            panel=panel,
-            color='white', width=1, alpha=0.5
-        )
-        y_tr_plot2 = mplf.make_addplot(
-            y_tr_value2, panel=panel,
-            color='coral', width=2, alpha=0.4, linestyle='dashed'
-        )
-
-        plots.extend([
-            y_tr_plot, price_plot, y_tr_plot2
-        ])
-
     def add_vol_plots(self, vol_panel=2):
         color_up, color_down = self.color_up, self.color_down
         data, plots = self.data, self.plots
@@ -239,8 +200,8 @@ class CandlestickPlot(object):
         ind = Indicators(data)
         ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
         data = ind.df
-        data['fr_high'] = data.apply(lambda x: x['Close'] * 1.08 if x['fr_high'] else np.NaN, axis=1)
-        data['fr_low'] = data.apply(lambda x: x['Close'] * 0.92 if x['fr_low'] else np.NaN, axis=1)
+        data['fr_high'] = data.apply(lambda x: x['Close'] * 1.08 if x['fr_high'] else np.nan, axis=1)
+        data['fr_low'] = data.apply(lambda x: x['Close'] * 0.92 if x['fr_low'] else np.nan, axis=1)
 
         fr_high_plot = mplf.make_addplot(
             data['fr_high'], panel=panel,
@@ -257,9 +218,8 @@ class CandlestickPlot(object):
 
     def create_candlestick_chart(self, step='1D'):
         self.add_rsi_plot(panel=0)
-        self.add_line_plots(panel=1)
         self.add_bb_plots(period=20, panel=1)
-        # self.add_fractal_plot(panel=1)
+        self.add_fractal_plot(panel=1)
         self.add_macd_plots(panel=2)
         self.add_vol_plots(vol_panel=3)
         custom_nc = self.get_nc_style()
