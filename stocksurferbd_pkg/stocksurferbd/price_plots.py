@@ -17,7 +17,7 @@ from tapy import Indicators
 class CandlestickPlot(object):
 
     def __init__(self, csv_path, symbol):
-        self.csv_path = csv_path
+        self.xlsx_path = csv_path
         self.data = None
         self.plots = []
         self.symbol = symbol
@@ -73,7 +73,7 @@ class CandlestickPlot(object):
 
     def process_data_mpl(self, resample=False, step='3D', vol_key='VOLUME'):
         df = pd.read_csv(
-            self.csv_path,
+            self.xlsx_path,
             sep=r'\s*,\s*',
             header=0,
             encoding='ascii',

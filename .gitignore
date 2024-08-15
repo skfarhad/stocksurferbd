@@ -5,8 +5,8 @@
 
 *.zip
 *.pyc
-*.csv
 *.xlsx
+*.csv
 *.ipynb
 *.gz
 *.p

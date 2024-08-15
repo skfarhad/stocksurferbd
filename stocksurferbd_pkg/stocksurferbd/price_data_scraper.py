@@ -7,6 +7,7 @@ __copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 import os
 import csv
 
+import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 import datetime
@@ -46,6 +47,11 @@ class PriceData(object):
             dict_writer = csv.DictWriter(output_file, keys)
             dict_writer.writeheader()
             dict_writer.writerows(dict_list)
+
+    @staticmethod
+    def save_excel(dict_list, csv_path):
+        df = pd.DataFrame(dict_list)
+        df.to_excel(csv_path)
 
     def get_history_url(self):
         cur_date = self.get_date()
@@ -217,33 +223,33 @@ class PriceData(object):
 
         return dict_list
 
-    def save_history_csv(self, symbol, csv_path='', file_name='history_data.csv', market='DSE'):
+    def save_history_data(self, symbol, file_path='', file_name='history_data.xlsx', market='DSE'):
         if market == 'DSE':
             full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
             target_page = requests.get(full_url)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             history_list = self. parse_price_history_dse(bs_data)
-            full_path = os.path.join(csv_path, file_name)
+            full_path = os.path.join(file_path, file_name)
 
         elif market == 'CSE':
             history_list = self.parse_price_history_cse(symbol)
-            full_path = os.path.join(csv_path, file_name)
+            full_path = os.path.join(file_path, file_name)
         else:
             raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
-        self.save_csv(dict_list=history_list, csv_path=full_path)
+        self.save_excel(dict_list=history_list, csv_path=full_path)
 
-    def save_current_csv(self, csv_path='', file_name='current_data.csv', market='DSE'):
+    def save_current_data(self, file_path='', file_name='current_data.xlsx', market='DSE'):
         if market == 'DSE':
             target_page = requests.get(self.CURRENT_PRICE_URL_DSE)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             current_data = self.parse_current_prices_dse(bs_data)
-            full_path = os.path.join(csv_path, file_name)
+            full_path = os.path.join(file_path, file_name)
         elif market == 'CSE':
             target_page = requests.get(self.CURRENT_PRICE_URL_CSE)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             current_data = self.parse_current_prices_cse(bs_data)
-            full_path = os.path.join(csv_path, file_name)
+            full_path = os.path.join(file_path, file_name)
         else:
             raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
-        self.save_csv(dict_list=current_data, csv_path=full_path)
+        self.save_excel(dict_list=current_data, csv_path=full_path)
 

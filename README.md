@@ -18,12 +18,13 @@ pip install stocksurferbd
 
 ```python
 from stocksurferbd import PriceData
+
 loader = PriceData()
 
-loader.save_history_csv(symbol='ACI', file_name='ACI_history.csv', market='DSE')
+loader.save_history_data(symbol='ACI', file_name='ACI_history.xlsx', market='DSE')
 ```
 
-The above code will create a file named- `ACI_history.csv`. 
+The above code will create a file named- `ACI_history.xlsx`. 
 It'll contain historical price data for ACI Limited in Dhaka Stock Exchange (DSE).
 
 
@@ -36,13 +37,15 @@ Probable values are ```'CSE'``` and ```'DSE'```
 
 
 #### Downloading current market price data of all listed companies in DSE/CSE-
+
 ```python
 from stocksurferbd import PriceData
+
 loader = PriceData()
 
-loader.save_current_csv(file_name='current_data.csv', market='DSE')
+loader.save_current_data(file_name='current_data.xlsx', market='DSE')
 ```
-The above code will create a file named- `current_history.csv` in the current folder. 
+The above code will create a file named- `current_history.xlsx` in the current folder. 
 It'll contain current price data for all symbols.
 
 There are 2 parameters for this method-
@@ -60,11 +63,11 @@ loader = FundamentalData()
 loader.save_company_data('ACI', path='company_info')
 
 ```
-The above code will create two files named `ACI_company_data.csv` & 
-`ACI_financial_data.csv` in the `company_info` folder relative to 
-current directory. The file named `ACI_company_data.csv` contains 
+The above code will create two files named `ACI_company_data.xlsx` & 
+`ACI_financial_data.xlsx` in the `company_info` folder relative to 
+current directory. The file named `ACI_company_data.xlsx` contains 
 the fundamental data of ACI Limited for the current year and
-`ACI_financial_data.csv` contains year-wise fundamental data according to [DSE website](http://dsebd.org).
+`ACI_financial_data.xlsx` contains year-wise fundamental data according to [DSE website](http://dsebd.org).
 
 There are 2 parameters `save_company_data()` this method-
 
@@ -77,7 +80,7 @@ There are 2 parameters `save_company_data()` this method-
 
 from stocksurferbd import CandlestickPlot
 
-cd_plot = CandlestickPlot(csv_path='ACI_history.csv', symbol='ACI')
+cd_plot = CandlestickPlot(csv_path='ACI_history.xlsx', symbol='ACI')
 cd_plot.show_plot(
     xtick_count=120, 
     resample=True, 

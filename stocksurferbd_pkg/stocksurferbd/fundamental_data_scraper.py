@@ -284,5 +284,5 @@ class FundamentalData(object):
 
     def save_company_data(self, symbol, path=''):
         company_df, fin_df = self.get_company_df(symbol)
-        company_df.to_csv(os.path.join(path, f'{symbol}_company_data.csv'), index=False)
-        fin_df.to_csv(os.path.join(path, f'{symbol}_financial_data.csv'), index=False)
+        company_df.to_excel(os.path.join(path, f'{symbol}_company_data.xlsx'), index=False)
+        fin_df.to_excel(os.path.join(path, f'{symbol}_financial_data.xlsx'), index=False)

@@ -10,7 +10,7 @@ import pandas as pd
 from stocksurferbd_pkg import PriceData
 
 
-CUR_FILE_NAME = 'dsebd_current_data.csv'
+CUR_FILE_NAME = 'dsebd_current_data.xlsx'
 HISTORY_FOLDER = 'dse_history_data'
 
 
@@ -18,7 +18,7 @@ loader = PriceData()
 
 
 def append_historical_data(symbol, df_cur, csv_path=''):
-    csv_path = os.path.join(csv_path, symbol + "_history_data.csv")
+    csv_path = os.path.join(csv_path, symbol + "_history_data.xlsx")
     df_history = pd.read_csv(
         csv_path,
         sep=r'\s*,\s*',
@@ -59,14 +59,14 @@ def append_historical_data(symbol, df_cur, csv_path=''):
 
 
 def fetch_all_stock_data():
-    loader.save_current_csv(file_name=CUR_FILE_NAME)
-    df = pd.read_csv(CUR_FILE_NAME)
+    loader.save_current_data(file_name=CUR_FILE_NAME)
+    df = pd.read_excel(CUR_FILE_NAME)
     symbols = df['TRADING_CODE'].values
     for sym in symbols:
         print('Downloading ' + sym + " data.....")
         try:
-            loader.save_history_csv(
-                sym, csv_path=HISTORY_FOLDER, file_name=sym + '_history_data.csv'
+            loader.save_history_data(
+                sym, file_path=HISTORY_FOLDER, file_name=sym + '_history_data.xlsx'
             )
             print('Downloading ' + sym + " Finished!")
         except Exception as e:
@@ -75,8 +75,8 @@ def fetch_all_stock_data():
 
 
 def append_all_stock_data():
-    loader.save_current_csv(file_name=CUR_FILE_NAME)
-    df_cur = pd.read_csv(CUR_FILE_NAME)
+    loader.save_current_data(file_name=CUR_FILE_NAME)
+    df_cur = pd.read_excel(CUR_FILE_NAME)
     symbols = df_cur['TRADING_CODE'].values
     for sym in symbols:
         print('Appending ' + sym + " data.....")
@@ -88,16 +88,6 @@ def append_all_stock_data():
     print('Data extraction finished')
 
 
-def main(args):
-    if args[0] == 'history_all':
-        fetch_all_stock_data()
-    elif args[0] == 'history_append':
-        append_all_stock_data()
-    else:
-        # loader.save_history_csv('KAY&QUE', file_name='KAY&QUE.csv')
-        loader.save_current_csv()
-
-
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    fetch_all_stock_data()
 
