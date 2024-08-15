@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = "Sk Farhad"
-__copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
+__copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 
 import numpy as np
 import pandas as pd

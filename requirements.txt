@@ -5,6 +5,7 @@ matplotlib==3.9.2
 mplfinance==0.12.7a17
 pyti==0.2.2
 tapy==1.9.1
+dateutil
 jupyter
 jupyterthemes
 wheel

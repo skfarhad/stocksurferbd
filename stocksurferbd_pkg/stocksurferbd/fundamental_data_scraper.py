@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 __author__ = "Sk Farhad"
-__copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
+__copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 
 import os
 import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 from dateutil import parser
-import json
+
 
 class FundamentalData(object):
     DSE_COMPANY_URL = "https://dsebd.org/displayCompany.php?name="
@@ -193,16 +193,11 @@ class FundamentalData(object):
         )
         count = 1
         for table in company_tables:
-            # print(">>>>>>>>>Contents in table no: ", count)
             table_rows = table.find_all("tr")
-            # print(table_rows)
-            # if count not in (1, ):
             cur_list = []
             for row in table_rows:
                 row_data = [" ".join(td.get_text().split()) for td in row.find_all("td")]
                 cur_list.append(row_data)
-            # print(cur_list)
-
             if count == 1:
                 company_info.update({
                     'ltp': cur_list[0][1],
@@ -225,8 +220,6 @@ class FundamentalData(object):
 
             elif count == 4:
                 # print('fin interim main: ')
-                for item in cur_list:
-                    print(item)
                 fin_interim_info.update({
                     'main': cur_list
                 })
@@ -270,13 +263,11 @@ class FundamentalData(object):
         df_company_all = pd.DataFrame()
         df_fin_perf_all = pd.DataFrame()
         full_url = self.DSE_COMPANY_URL + symbol
-        # print("URL: " + full_url)
         target_page = requests.get(full_url)
         page_html = BeautifulSoup(target_page.text, 'html.parser')
         dict_company, dict_fin_perf = self.parse_company_data_rows(
             page_html, symbol
         )
-        print("Fetching data for: ", symbol)
         df_company = self.append_company(
             company_info=dict_company['company_info'],
             fin_interim_info=dict_company['fin_interim_info'],
@@ -288,7 +279,7 @@ class FundamentalData(object):
             symbol=symbol
         )
         df_fin_perf_all = pd.concat([df_fin_perf_all, df_fin_perf])
-        print("Fetch complete!")
+        print(f"Download completed for {symbol}!")
         return df_company_all, df_fin_perf_all
 
     def save_company_data(self, symbol, path=''):
