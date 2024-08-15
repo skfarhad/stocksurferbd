@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
 __author__ = "Sk Farhad"
-__copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
-
+__copyright__ = "Copyright (c) 2021 The Python Packaging Authority"
 
 import os
 import csv
 
-import pandas as pd
 from bs4 import BeautifulSoup
+import pandas as pd
 import requests
 import datetime
 from dateutil import parser
@@ -16,11 +15,11 @@ import urllib.parse as parse_url
 
 
 class PriceData(object):
-
     HISTORY_URL_DSE = "https://www.dsebd.org/day_end_archive.php?endDate=<date>&archive=data"
     HISTORY_URL_CSE = "https://www.cse.com.bd/company/company_graph_6m/"
-    CURRENT_PRICE_URL_DSE = 'https://www.dsebd.org/dseX_share.php'
+    CURRENT_PRICE_URL_DSE = 'https://www.dsebd.org/latest_share_price_scroll_l.php'
     CURRENT_PRICE_URL_CSE = 'https://www.cse.com.bd/market/current_price'
+    CKT_BREAKER_URL_DSE = 'https://www.dsebd.org/cbul.php'
 
     @staticmethod
     def get_date():
@@ -57,9 +56,12 @@ class PriceData(object):
         cur_date = self.get_date()
         return self.HISTORY_URL_DSE.replace('<date>', cur_date)
 
-    def parse_price_history_dse(self, soup):
+    def parse_price_history_dse(self, symbol):
+        full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
+        target_page = requests.get(full_url)
+        bs_data = BeautifulSoup(target_page.text, 'html.parser')
         dict_list = []
-        stock_table = soup.find(
+        stock_table = bs_data.find(
             "table",
             attrs={
                 "class": "table table-bordered background-white shares-table fixedHeader"
@@ -86,7 +88,7 @@ class PriceData(object):
                 print(str(e))
         return dict_list
 
-    def parse_current_prices_dse(self, soup):
+    def parse_current_prices_dse(self, soup, fp_dict=None):
         dict_list = []
         table_header = soup.find(
             'h2',
@@ -106,7 +108,7 @@ class PriceData(object):
         stock_table = soup.find(
             "table",
             attrs={
-                "class": "table table-bordered background-white shares-table"
+                "class": "table table-bordered background-white shares-table fixedHeader"
             }
         )
         table_rows = stock_table.find_all("tr")
@@ -130,8 +132,33 @@ class PriceData(object):
                 'TRADE': self.parse_float(td_values[8]),
                 'VALUE_MN': self.parse_float(td_values[9]),
                 'VOLUME': self.parse_float(td_values[10]),
+                # 'PUB_FP': fp_dict[td_values[1]][0] if fp_dict else 0,
             })
         return dict_list
+
+    def parse_floor_prices_dse(self, soup):
+        fp_price_dict = {}
+        price_table = soup.find(
+            "table",
+            attrs={
+                "class": "table table-bordered background-white text-center"
+            }
+        )
+        table_rows = price_table.find_all("tr")
+        # print(type(table_rows))
+        for row in table_rows:
+            th_values = ["".join(th.get_text().split()) for th in row.find_all("th")]
+            td_values = ["".join(td.get_text().split()) for td in row.find_all("td")]
+            if len(th_values):
+                # print(th_values)
+                continue
+            fp_price_dict.update({
+                td_values[1]: (
+                    self.parse_float(td_values[5]) if td_values[5] != '-' else 0,
+                    self.parse_float(td_values[8]) if td_values[8] != '-' else 0
+                )
+            })
+        return fp_price_dict
 
     def parse_current_prices_cse(self, soup):
         dict_list = []
@@ -223,12 +250,9 @@ class PriceData(object):
 
         return dict_list
 
-    def save_history_data(self, symbol, file_path='', file_name='history_data.xlsx', market='DSE'):
+    def save_history_data(self, symbol, file_path='', file_name='history_data.csv', market='DSE'):
         if market == 'DSE':
-            full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
-            target_page = requests.get(full_url)
-            bs_data = BeautifulSoup(target_page.text, 'html.parser')
-            history_list = self. parse_price_history_dse(bs_data)
+            history_list = self.parse_price_history_dse(symbol)
             full_path = os.path.join(file_path, file_name)
 
         elif market == 'CSE':
@@ -238,8 +262,11 @@ class PriceData(object):
             raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
         self.save_excel(dict_list=history_list, csv_path=full_path)
 
-    def save_current_data(self, file_path='', file_name='current_data.xlsx', market='DSE'):
+    def save_current_data(self, file_path='', file_name='dsebd_current_data.csv', market='DSE'):
         if market == 'DSE':
+            # target_page = requests.get(self.CKT_BREAKER_URL_DSE)
+            # fp_data = BeautifulSoup(target_page.text, 'html.parser')
+            # fp_dict = self.parse_floor_prices_dse(fp_data)
             target_page = requests.get(self.CURRENT_PRICE_URL_DSE)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             current_data = self.parse_current_prices_dse(bs_data)
@@ -252,4 +279,3 @@ class PriceData(object):
         else:
             raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
         self.save_excel(dict_list=current_data, csv_path=full_path)
-
