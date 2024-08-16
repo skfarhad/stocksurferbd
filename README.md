@@ -82,8 +82,8 @@ from stocksurferbd import CandlestickPlot
 
 cd_plot = CandlestickPlot(csv_path='ACI_history.xlsx', symbol='ACI')
 cd_plot.show_plot(
-    xtick_count=120, 
-    resample=True, 
+    data_n=120,
+    resample=True,
     step='3D'
 )
 ```
@@ -98,7 +98,7 @@ Stock broker trading panels.
 
 <br/>There are also 3 parameters show_plot() method-
 
-1. ```xtick_count``` : Provide an integer value. 
+1. ```data_n``` : Provide an integer value. 
    It sets the count of how many recent data points needs to be plotted.
 2. ```resample``` : Provide boolean ```True``` or ```False```. 
    Set ```True``` if you want to plot daily data aggregated by multiple days.

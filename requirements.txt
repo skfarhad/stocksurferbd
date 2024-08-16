@@ -1,4 +1,4 @@
-requests==2.25.1
+requests==2.32.3
 pandas==2.2.2
 openpyxl==3.1.5
 beautifulsoup4==4.9.3
@@ -6,8 +6,5 @@ matplotlib==3.9.2
 mplfinance==0.12.7a17
 pyti==0.2.2
 tapy==1.9.1
-jupyter
-jupyterthemes
 wheel
 twine
-pynamodb

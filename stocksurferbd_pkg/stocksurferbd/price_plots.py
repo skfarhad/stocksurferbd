@@ -16,27 +16,47 @@ from tapy import Indicators
 
 class CandlestickPlot(object):
 
-    def __init__(self, csv_path, symbol):
-        self.xlsx_path = csv_path
+    def __init__(
+        self,
+        file_path,
+        symbol,
+        data_n=120,
+        macd_fast=10,
+        macd_slow=22,
+        macd_smooth=7,
+        rsi_period=10,
+        bb_period=10,
+    ):
+        self.file_path = file_path
         self.data = None
+        self.data_n = data_n
         self.plots = []
         self.symbol = symbol
         self.color_up = 'limegreen'
         self.color_down = 'tomato'
+        self.macd_fast = macd_fast
+        self.macd_slow = macd_slow
+        self.macd_smooth = macd_smooth
+        self.rsi_period = rsi_period
+        self.bb_period = bb_period
 
-    @staticmethod
-    def get_macd(data, n_fast=10, n_slow=22, n_smooth=7):
-        fast_ema = data.ewm(span=n_fast, min_periods=n_slow).mean()
-        slow_ema = data.ewm(span=n_slow, min_periods=n_slow).mean()
+    def get_macd(self, data):
+        macd_n = self.data_n + max(self.macd_slow, self.macd_fast)
+        macd_data = data[-macd_n:]
+        fast_ema = macd_data.ewm(
+            span=self.macd_fast, min_periods=self.macd_slow
+        ).mean()
+        slow_ema = macd_data.ewm(
+            span=self.macd_slow, min_periods=self.macd_slow
+        ).mean()
         macd = pd.Series(fast_ema - slow_ema, name='macd')
-        macd_sig = pd.Series(macd.ewm(span=n_smooth, min_periods=n_smooth).mean(), name='macd_sig')
+        macd_sig = pd.Series(
+            macd.ewm(span=self.macd_smooth,min_periods=self.macd_smooth).mean(),
+            name='macd_sig'
+        )
         macd_hist = pd.Series(macd - macd_sig, name='macd_hist')
 
-        return macd, macd_sig, macd_hist
-
-    @staticmethod
-    def get_n_short(data_len):
-        return data_len // 3
+        return macd[-self.data_n:], macd_sig[-self.data_n:], macd_hist[-self.data_n:]
 
     @staticmethod
     def get_weekly(df, step='3D'):
@@ -72,14 +92,7 @@ class CandlestickPlot(object):
         return ncs
 
     def process_data_mpl(self, resample=False, step='3D', vol_key='VOLUME'):
-        df = pd.read_csv(
-            self.xlsx_path,
-            sep=r'\s*,\s*',
-            header=0,
-            encoding='ascii',
-            engine='python',
-        )
-        # print(df.head())
+        df = pd.read_excel(self.file_path)
         columns = ['DATE', 'CLOSEP', vol_key, 'HIGH', 'LOW', 'OPENP', 'TRADE']
         df = df[columns]
         df = df.rename(columns={
@@ -112,12 +125,14 @@ class CandlestickPlot(object):
         self.data = df
         return
 
-    def add_bb_plots(self, period=20, panel=0):
+    def add_bb_plots(self, panel=0):
         data, plots = self.data, self.plots
-        data_cl = data['Close'].values.tolist()
-        bb_u = bb_up(data_cl, period)
-        bb_l = bb_low(data_cl, period)
-        bb_m = bb_mid(data_cl, period)
+        bb_n = self.data_n + self.bb_period
+        bb_data = data[-bb_n:]
+        data_cl = bb_data['Close'].values.tolist()
+        bb_u = bb_up(data_cl, self.bb_period)[-self.data_n:]
+        bb_l = bb_low(data_cl, self.bb_period)[-self.data_n:]
+        bb_m = bb_mid(data_cl, self.bb_period)[-self.data_n:]
 
         bb_m_plot = mplf.make_addplot(bb_m, panel=panel, color='cyan', width=1, alpha=0.5)
         bb_l_plot = mplf.make_addplot(bb_l, panel=panel, color='yellow', width=1, alpha=0.3)
@@ -151,23 +166,24 @@ class CandlestickPlot(object):
             macd_plot, macd_signal_plot, macd_hist_plot
         ])
 
-    def add_rsi_plot(self, panel=0, timeperiod=10):
+    def add_rsi_plot(self, panel=0):
         data, plots = self.data, self.plots
+        rsi_n = self.data_n + self.rsi_period
+        rsi_data = data[-rsi_n:]
         color_up, color_down = self.color_up, self.color_down
-        n_data = len(data)
-        rsi = RSI(data['Close'], period=timeperiod)
+        rsi = RSI(rsi_data['Close'], period=self.rsi_period)[-self.data_n:]
 
         line_rsi = mplf.make_addplot(
             rsi, panel=panel, color='gray', ylabel='RSI', width=1.5,
         )
 
         line_os = mplf.make_addplot(
-            [70] * n_data, panel=panel,
+            [70] * self.data_n, panel=panel,
             color=color_down, alpha=.5, linestyle='dashed', width=1.5,
             secondary_y=False
         )
         line_ob = mplf.make_addplot(
-            [30] * n_data,
+            [30] * self.data_n,
             panel=panel,
             color=color_up, alpha=.5, linestyle='dashed', width=1.5,
             secondary_y=False,
@@ -181,12 +197,13 @@ class CandlestickPlot(object):
     def add_vol_plots(self, vol_panel=2):
         color_up, color_down = self.color_up, self.color_down
         data, plots = self.data, self.plots
-        vol_colors = data.apply(
+        vol_data = data[-self.data_n:]
+        vol_colors = vol_data.apply(
             lambda x: color_up if x['Close'] > x['Open'] else color_down,
             axis=1
         )
         volume_plot = mplf.make_addplot(
-            data['Volume'],
+            vol_data['Volume'],
             panel=vol_panel,
             color=vol_colors.values,
             type='bar',
@@ -197,19 +214,20 @@ class CandlestickPlot(object):
     def add_fractal_plot(self, panel=0):
         data, plots = self.data, self.plots
         color_up, color_down = self.color_up, self.color_down
-        ind = Indicators(data)
+        fr_data = data[-self.data_n:]
+        ind = Indicators(fr_data)
         ind.fractals(column_name_high='fr_high', column_name_low='fr_low')
-        data = ind.df
-        data['fr_high'] = data.apply(lambda x: x['Close'] * 1.08 if x['fr_high'] else np.nan, axis=1)
-        data['fr_low'] = data.apply(lambda x: x['Close'] * 0.92 if x['fr_low'] else np.nan, axis=1)
+        fr_data = ind.df
+        fr_data['fr_high'] = fr_data.apply(lambda x: x['Close'] * 1.08 if x['fr_high'] else np.nan, axis=1)
+        fr_data['fr_low'] = fr_data.apply(lambda x: x['Close'] * 0.92 if x['fr_low'] else np.nan, axis=1)
 
         fr_high_plot = mplf.make_addplot(
-            data['fr_high'], panel=panel,
+            fr_data['fr_high'], panel=panel,
             color=color_down, width=1, type='step', alpha=.9,
             secondary_y=False,
         )
         fr_low_plot = mplf.make_addplot(
-            data['fr_low'], panel=panel,
+            fr_data['fr_low'], panel=panel,
             color=color_up, width=1, type='step', alpha=.9,
             secondary_y=False,
 
@@ -218,12 +236,12 @@ class CandlestickPlot(object):
 
     def create_candlestick_chart(self, step='1D'):
         self.add_rsi_plot(panel=0)
-        self.add_bb_plots(period=20, panel=1)
+        self.add_bb_plots(panel=1)
         self.add_fractal_plot(panel=1)
         self.add_macd_plots(panel=2)
         self.add_vol_plots(vol_panel=3)
         custom_nc = self.get_nc_style()
-        data_mpl = self.data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']]
+        data_mpl = self.data[['Date', 'Open', 'Close', 'Volume', 'High', 'Low']][-self.data_n:]
         fig, axlist = mplf.plot(
             data_mpl,
             type='candle',
@@ -243,19 +261,18 @@ class CandlestickPlot(object):
 
         return fig, axlist
 
-    def show_plot(self, xtick_count=120, resample=False, step='1D'):
+    def show_plot(self, data_n=120, resample=False, step='1D'):
         self.process_data_mpl(resample=resample, step=step)
-        self.data = self.data[-xtick_count:]
+        self.data_n = data_n
         if not resample:
             step = '1D'
         fig, axlist = self.create_candlestick_chart(step=step)
         plt.show()
 
-    def get_candlestick_fig(self, xtick_count=120, resample=False, step='1D'):
+    def get_candlestick_fig(self, data_n=120, resample=False, step='1D'):
         self.process_data_mpl(resample=resample, step=step)
-        self.data = self.data[-xtick_count:]
+        self.data_n = data_n
         if not resample:
             step = '1D'
         fig, axlist = self.create_candlestick_chart(step=step)
         return fig, axlist
-
