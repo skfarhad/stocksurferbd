@@ -1,0 +1,10 @@
+version: 3.0
+last_compiled: 2026-06-17
+
+# ================================================
+# stocksurferbd - Agent OS Configuration
+# ================================================
+profile: default
+product_name: stocksurferbd
+product_type: python-library
+description: Python library for downloading price history and fundamental data of Dhaka (DSE) and Chittagong (CSE) Stock Exchange companies, plus a candlestick plotting wrapper over mplfinance.

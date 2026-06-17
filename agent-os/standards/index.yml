@@ -1,0 +1,24 @@
+# Agent OS Standards Index
+# stocksurferbd - Python library for DSE/CSE market data
+
+python:
+  coding:
+    description: Python coding standards - SOLID, flat design, type hints, naming, no magic strings
+
+global:
+  coding-style:
+    description: Formatting rules, naming consistency, DRY, dead-code removal
+  commenting:
+    description: Code documentation and commenting standards
+  conventions:
+    description: Project structure, version control, dependency management
+  error-handling:
+    description: Error handling for scrapers - network failures, parse failures, missing data
+  tech-stack:
+    description: stocksurferbd tech stack - requests, BeautifulSoup, pandas, mplfinance
+  validation:
+    description: Input validation - symbols, market codes, plotting parameters
+
+testing:
+  test-writing:
+    description: Test organization - parsing tests against saved HTML fixtures, mocking HTTP

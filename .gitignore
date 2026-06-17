@@ -15,6 +15,9 @@
 
 
 
+# Claude Code local/personal settings (machine-specific, not shared)
+.claude/settings.local.json
+
 venv/
 env/
 __pycache__/

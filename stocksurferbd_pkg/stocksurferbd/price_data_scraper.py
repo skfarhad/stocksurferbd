@@ -8,13 +8,14 @@ import csv
 
 from bs4 import BeautifulSoup
 import pandas as pd
-import requests
 import datetime
 from dateutil import parser
 import urllib.parse as parse_url
 
+from .utils import HttpScraper
 
-class PriceData(object):
+
+class PriceData(HttpScraper):
     HISTORY_URL_DSE = "https://www.dsebd.org/day_end_archive.php?endDate=<date>&archive=data"
     HISTORY_URL_CSE = "https://www.cse.com.bd/company/company_graph_6m/"
     CURRENT_PRICE_URL_DSE = 'https://www.dsebd.org/latest_share_price_scroll_l.php'
@@ -58,7 +59,7 @@ class PriceData(object):
 
     def parse_price_history_dse(self, symbol):
         full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
-        target_page = requests.get(full_url)
+        target_page = self._get(full_url)
         bs_data = BeautifulSoup(target_page.text, 'html.parser')
         dict_list = []
         stock_table = bs_data.find(
@@ -195,9 +196,7 @@ class PriceData(object):
 
     def parse_price_history_cse(self, symbol):
         full_url = self.HISTORY_URL_CSE + symbol
-        resp = requests.get(
-            full_url
-        )
+        resp = self._get(full_url)
 
         split1 = resp.text.split("volumeData.push([date, round(volume)]);")[1]
         split2 = split1.split("$(document).ready(function () {")[0]
@@ -264,15 +263,12 @@ class PriceData(object):
 
     def save_current_data(self, file_path='', file_name='dsebd_current_data.csv', market='DSE'):
         if market == 'DSE':
-            # target_page = requests.get(self.CKT_BREAKER_URL_DSE)
-            # fp_data = BeautifulSoup(target_page.text, 'html.parser')
-            # fp_dict = self.parse_floor_prices_dse(fp_data)
-            target_page = requests.get(self.CURRENT_PRICE_URL_DSE)
+            target_page = self._get(self.CURRENT_PRICE_URL_DSE)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             current_data = self.parse_current_prices_dse(bs_data)
             full_path = os.path.join(file_path, file_name)
         elif market == 'CSE':
-            target_page = requests.get(self.CURRENT_PRICE_URL_CSE)
+            target_page = self._get(self.CURRENT_PRICE_URL_CSE)
             bs_data = BeautifulSoup(target_page.text, 'html.parser')
             current_data = self.parse_current_prices_cse(bs_data)
             full_path = os.path.join(file_path, file_name)

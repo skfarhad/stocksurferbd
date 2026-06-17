@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:dsebd.org)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "WebFetch(domain:www.dsebd.org)",
+      "Bash(echo \"compile done \\(rc=$?\\)\")",
+      "Bash(rm -rf e:/tmp/e2e)",
+      "Bash(mkdir -p e:/tmp/e2e)",
+      "Bash(git checkout *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --base master --head feature/news-blocktrade-scrapers --title 'Add company identity/links, news and block-trade scraping' --body ' *)"
+    ]
+  }
+}
