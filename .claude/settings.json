@@ -12,7 +12,17 @@
       "Bash(git checkout *)",
       "Bash(git commit -q -m ' *)",
       "Bash(git push *)",
-      "Bash(gh pr create --base master --head feature/news-blocktrade-scrapers --title 'Add company identity/links, news and block-trade scraping' --body ' *)"
+      "Bash(gh pr create --base master --head feature/news-blocktrade-scrapers --title 'Add company identity/links, news and block-trade scraping' --body ' *)",
+      "Bash(gh pr *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(git ls-remote *)",
+      "Bash(git branch *)",
+      "Bash(./.venv/Scripts/python.exe -c \"import importlib.util as u; [print\\(m, 'OK' if u.find_spec\\(m\\) else 'MISSING'\\) for m in ['requests','bs4','pandas','openpyxl','matplotlib','mplfinance','pyti','tapy','pytest','twine','wheel']]\")",
+      "Bash(./.venv/Scripts/python.exe -m pip install -q --upgrade pip)",
+      "Bash(./.venv/Scripts/python.exe -m pip install -q -r requirements.txt pytest)",
+      "Bash(./.venv/Scripts/python.exe -m pytest tests/ -q)",
+      "Bash(git fetch *)"
     ]
   }
 }
