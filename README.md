@@ -105,6 +105,9 @@ loader.save_news_data('ACI', path='company_info', years=2)
 The above code creates `ACI_news_data.xlsx` in the `company_info` folder with
 columns `symbol`, `date`, `title` and `news`, sorted newest first.
 
+> **DSE only.** Company fundamentals and news are sourced from the DSE
+> website; CSE is not supported for these.
+
 Parameters of `save_news_data()`-
 
 1. ```symbol``` : Provide stock symbol of the company as string.
@@ -132,6 +135,9 @@ provides a historical per-company proxy from block-market related news.
 
 Both methods also have `get_block_trades_df()` and `get_block_trade_news_df()`
 variants that return a `pandas` DataFrame instead of writing a file.
+
+> **DSE only.** Block trade data is available for DSE only (`market='DSE'`);
+> CSE is not supported.
 
 #### Create Candlestick charts for analyzing price history-
 
