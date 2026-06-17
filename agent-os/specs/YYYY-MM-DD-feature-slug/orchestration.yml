@@ -1,0 +1,53 @@
+# Orchestration Configuration
+# This file defines the workflow for implementing this feature
+
+version: 1.0
+
+metadata:
+  slug: feature-slug
+  type: feature  # feature | bugfix | refactor
+  created: YYYY-MM-DD
+  branch: feature/feature-slug
+
+# Dependencies between task groups
+dependencies:
+  - group: setup-models
+    depends_on: []
+  - group: api-development
+    depends_on: [setup-models]
+  - group: frontend
+    depends_on: [api-development]
+  - group: testing
+    depends_on: [api-development, frontend]
+  - group: documentation
+    depends_on: [testing]
+
+# Verification steps after each group
+verification:
+  setup-models:
+    - command: docker compose exec be python manage.py check
+    - command: docker compose exec be python manage.py migrate --check
+  api-development:
+    - command: docker compose exec be pytest apps/<app>/tests/ -v
+  frontend:
+    - manual: Check UI in browser at http://localhost:8001/
+  testing:
+    - command: docker compose exec be pytest --cov=apps --cov-report=term-missing
+  documentation:
+    - manual: Review API docs at http://localhost:8001/swagger/
+
+# Rollback commands if something fails
+rollback:
+  setup-models:
+    - command: docker compose exec be python manage.py migrate <app> <previous_migration>
+  api-development:
+    - command: git checkout -- apps/<app>/
+  frontend:
+    - command: git checkout -- apps/webui/
+
+# Completion criteria
+completion:
+  - All tasks marked ✅ Complete
+  - All tests passing
+  - Code reviewed
+  - Merged to target branch
