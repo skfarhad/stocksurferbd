@@ -4,15 +4,20 @@ __author__ = "Sk Farhad"
 __copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 
 import os
+import urllib.parse as parse_url
+from datetime import datetime
 import pandas as pd
 from bs4 import BeautifulSoup
-import requests
 from dateutil import parser
+from dateutil.relativedelta import relativedelta
+
+from .utils import HttpScraper
 
 
-class FundamentalData(object):
+class FundamentalData(HttpScraper):
     DSE_COMPANY_URL = "https://dsebd.org/displayCompany.php?name="
     CURRENT_PRICE_URL = 'https://www.dsebd.org/dseX_share.php'
+    NEWS_URL = "https://www.dsebd.org/old_news.php?archive=news&criteria=3&inst="
 
     @staticmethod
     def parse_float(str_val):
@@ -29,7 +34,7 @@ class FundamentalData(object):
         return int(new_val)
 
     @staticmethod
-    def append_company(company_info, fin_interim_info, symbol):
+    def append_company(company_info, fin_interim_info, symbol, meta=None):
         company_dict = {
             'symbol': symbol,
             'auth_capital': company_info['basic'][0][0],
@@ -94,6 +99,9 @@ class FundamentalData(object):
             'eps_cop_diluted_9m': fin_interim_info['main'][9][5],
             'eps_cop_diluted_yr': fin_interim_info['main'][9][6],
         }
+        # Append company identity/links as extra columns (backward compatible:
+        # existing columns keep their order, new ones are added at the end).
+        company_dict.update(meta or {})
         df_company = pd.DataFrame(company_dict, index=[0])
 
         return df_company
@@ -162,6 +170,101 @@ class FundamentalData(object):
         )
 
         return df_fin_perf
+
+    @staticmethod
+    def _table_after_heading(soup, heading_text):
+        heading_text = heading_text.lower()
+        for head in soup.find_all(["h2", "h3", "h4"]):
+            if heading_text in " ".join(head.get_text().split()).lower():
+                return head.find_next("table")
+        return None
+
+    @staticmethod
+    def parse_company_meta(soup):
+        """Company identity and disclosure links from the company page.
+
+        Returns a dict with company_name, website, address,
+        financial_statement_link and price_sensitive_info_link. Parsing is
+        label-based (not positional) and never raises: any field that cannot be
+        found defaults to '-' so the core company/financial extraction is
+        unaffected.
+        """
+        meta = {
+            'company_name': '-',
+            'website': '-',
+            'address': '-',
+            'financial_statement_link': '-',
+            'price_sensitive_info_link': '-',
+        }
+        try:
+            for head in soup.find_all("h2"):
+                text = " ".join(head.get_text().split())
+                if text.lower().startswith("company name"):
+                    meta['company_name'] = text.split(":", 1)[1].strip()
+                    break
+
+            address_table = FundamentalData._table_after_heading(
+                soup, "Address of the Company"
+            )
+            if address_table is not None:
+                for row in address_table.find_all("tr"):
+                    cells = [" ".join(td.get_text(" ").split()) for td in row.find_all(["td", "th"])]
+                    if not cells:
+                        continue
+                    if cells[0] == "Web Address":
+                        link = row.find("a", href=True)
+                        meta['website'] = link['href'] if link else (cells[1] if len(cells) > 1 else '-')
+                    elif cells[0] == "Address" and len(cells) >= 3:
+                        meta['address'] = cells[2]
+
+            for row in soup.find_all("tr"):
+                cells = [" ".join(td.get_text(" ").split()) for td in row.find_all(["td", "th"])]
+                if not cells:
+                    continue
+                label = cells[0]
+                if label.startswith("Details of Financial Statement"):
+                    link = row.find("a", href=True)
+                    meta['financial_statement_link'] = link['href'] if link else (cells[1] if len(cells) > 1 else '-')
+                elif label.startswith("Price Sensitive Information"):
+                    link = row.find("a", href=True)
+                    meta['price_sensitive_info_link'] = link['href'] if link else (cells[1] if len(cells) > 1 else '-')
+        except Exception as e:
+            print(f"Company meta parse warning: {e}")
+        return meta
+
+    @staticmethod
+    def parse_news_rows(soup, symbol):
+        """Parse the company news feed (``table-news``) into a list of records.
+
+        Each news item is a block of label/value rows (Trading Code, News
+        Title, News, Post Date). Returns a list of dicts with keys symbol,
+        date, title and news.
+        """
+        records = []
+        table = soup.find("table", class_="table-news")
+        if table is None:
+            return records
+        current = {}
+        for row in table.find_all("tr"):
+            cells = [" ".join(td.get_text(" ").split()) for td in row.find_all(["td", "th"])]
+            if len(cells) < 2:
+                continue
+            label, value = cells[0].rstrip(":").strip(), cells[1]
+            if label == "Trading Code":
+                if current:
+                    records.append(current)
+                current = {'symbol': symbol, 'date': '', 'title': '', 'news': ''}
+            elif not current:
+                continue
+            elif label == "News Title":
+                current['title'] = value
+            elif label == "News":
+                current['news'] = value
+            elif label == "Post Date":
+                current['date'] = value
+        if current:
+            records.append(current)
+        return records
 
     @staticmethod
     def parse_company_data_rows(soup, symbol):
@@ -262,16 +365,18 @@ class FundamentalData(object):
     def get_company_df(self, symbol):
         df_company_all = pd.DataFrame()
         df_fin_perf_all = pd.DataFrame()
-        full_url = self.DSE_COMPANY_URL + symbol
-        target_page = requests.get(full_url)
+        full_url = self.DSE_COMPANY_URL + parse_url.quote(symbol)
+        target_page = self._get(full_url)
         page_html = BeautifulSoup(target_page.text, 'html.parser')
         dict_company, dict_fin_perf = self.parse_company_data_rows(
             page_html, symbol
         )
+        company_meta = self.parse_company_meta(page_html)
         df_company = self.append_company(
             company_info=dict_company['company_info'],
             fin_interim_info=dict_company['fin_interim_info'],
-            symbol=symbol
+            symbol=symbol,
+            meta=company_meta
         )
         df_company_all = pd.concat([df_company_all, df_company])
         df_fin_perf = self.append_fin_perf(
@@ -286,3 +391,35 @@ class FundamentalData(object):
         company_df, fin_df = self.get_company_df(symbol)
         company_df.to_excel(os.path.join(path, f'{symbol}_company_data.xlsx'), index=False)
         fin_df.to_excel(os.path.join(path, f'{symbol}_financial_data.xlsx'), index=False)
+
+    def get_news_df(self, symbol, years=2):
+        """Company news/disclosures from the DSE news archive.
+
+        Returns a DataFrame with columns symbol, date, title and news, sorted
+        newest first. ``years`` limits the result to news posted within the
+        last N years (rolling window from today); pass ``years=None`` to return
+        every available record.
+        """
+        full_url = self.NEWS_URL + parse_url.quote(symbol)
+        target_page = self._get(full_url)
+        page_html = BeautifulSoup(target_page.text, 'html.parser')
+        records = self.parse_news_rows(page_html, symbol)
+        df_news = pd.DataFrame(records, columns=['symbol', 'date', 'title', 'news'])
+        if df_news.empty:
+            return df_news
+        df_news['date'] = pd.to_datetime(df_news['date'], errors='coerce')
+        df_news = df_news.dropna(subset=['date'])
+        if years is not None:
+            cutoff = pd.Timestamp(datetime.now().date() - relativedelta(years=years))
+            df_news = df_news[df_news['date'] >= cutoff]
+        df_news = df_news.sort_values('date', ascending=False).reset_index(drop=True)
+        df_news['date'] = df_news['date'].dt.date
+        return df_news
+
+    def save_news_data(self, symbol, path='', years=2):
+        news_df = self.get_news_df(symbol, years=years)
+        if news_df.empty:
+            print(f"No news data found for {symbol}.")
+            return
+        news_df.to_excel(os.path.join(path, f'{symbol}_news_data.xlsx'), index=False)
+        print(f"News download completed for {symbol}!")

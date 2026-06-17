@@ -6,4 +6,5 @@ __copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 
 from .stocksurferbd import PriceData
 from .stocksurferbd import FundamentalData
+from .stocksurferbd import BlockTradeData
 from .stocksurferbd import CandlestickPlot
