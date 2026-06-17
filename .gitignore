@@ -18,6 +18,10 @@
 # Claude Code local/personal settings (machine-specific, not shared)
 .claude/settings.local.json
 
+# Secrets / credentials (e.g. PyPI token for twine) - never commit
+.env
+.env.*
+
 venv/
 env/
 __pycache__/
