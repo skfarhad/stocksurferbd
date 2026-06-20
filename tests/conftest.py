@@ -30,3 +30,18 @@ def news_soup():
 @pytest.fixture
 def market_stats_soup():
     return _load_soup("dse_market_statistics.html")
+
+
+@pytest.fixture
+def index_history_soup():
+    return _load_soup("dse_index_history.html")
+
+
+@pytest.fixture
+def index_graph_text():
+    return (FIXTURES / "dse_index_graph_cdset.html").read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def home_indices_html():
+    return (FIXTURES / "dse_home_indices.html").read_text(encoding="utf-8")
