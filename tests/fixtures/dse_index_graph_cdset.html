@@ -1,0 +1,43 @@
+<html>
+<head>
+<script type="text/javascript" src="js/dygraph-combined.js"></script>
+</head>
+<body>
+    <strong>Highest value:</strong> 1129.18197<br>
+    <strong>Lowest value:</strong> 1057.96876<br><br>
+    <strong>Index Graph of Last 30 days</strong><br><br>
+    <div id="graphdiv2" style="width:700px; height:345px;"></div>
+    
+    <script type="text/javascript">
+  g = new Dygraph(
+
+    // containing div
+    document.getElementById("graphdiv2"),
+        // CSV or path to a CSV file.
+    "Date,CDSET Index\n" +
+    "2026-05-21,1057.96876\n"+"2026-05-23,1075.98961\n"+"2026-05-24,1075.6256\n"+"2026-06-01,1083.66158\n"+"2026-06-02,1086.55208\n"+"2026-06-03,1089.02361\n"+"2026-06-04,1090.69247\n"+"2026-06-07,1101.71308\n"+"2026-06-08,1093.42245\n"+"2026-06-09,1094.47788\n"+"2026-06-10,1094.24846\n"+"2026-06-11,1093.71265\n"+"2026-06-14,1116.3409\n"+"2026-06-15,1123.03532\n"+"2026-06-16,1113.44199\n"+"2026-06-17,1115.23855\n"+"2026-06-18,1129.18197\n",
+    
+    {
+     // options go here. See http://dygraphs.com/options.html
+     legend: 'always',
+	// maxNumberWidth: '10',
+     animatedZooms: false,
+     title: 'CDSET Index',
+     colors: ['#2865a0', '#2865a0'],
+     series: {
+         'Index': {
+             fillGraph: true,
+             strokeWidth: 1,
+             highlightCircleSize: 3
+         }
+     }
+
+  });
+</script>
+    <br><br>
+            <a href="monthly_graph_index.php?type=cdset&duration=12">Yearly Graph</a>
+        <br><br>
+    <a href="javascript:void(0)" onClick="javascript:window.close();">Close this window</a>
+</body>
+</html>
+

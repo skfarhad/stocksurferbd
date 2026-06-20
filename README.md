@@ -139,6 +139,52 @@ variants that return a `pandas` DataFrame instead of writing a file.
 > **DSE only.** Block trade data is available for DSE only (`market='DSE'`);
 > CSE is not supported.
 
+#### Downloading market index data from DSE (DSEX, DSES, DS30, DGEN, CDSET)-
+
+```python
+from stocksurferbd import IndexData
+loader = IndexData()
+
+# Rolling ~30 trading days of day-wise index values (DSEX, DSES, DS30, DGEN)
+loader.save_index_history(file_name='index_data.xlsx', market='DSE')
+
+# Full historical archive for any date range (data available from ~2010 onward)
+loader.save_index_history(
+    file_name='dsex_2020.xlsx', market='DSE',
+    start_date='2020-01-01', end_date='2020-12-31',
+)
+
+# Daily history for CDSET (or DS30) by month-count — CDSET goes back to ~2016
+loader.save_index_graph(index='CDSET', months=120, file_name='CDSET_history.xlsx', market='DSE')
+
+# Live snapshot of all indices, including CDSET
+loader.save_current_indices(file_name='current_indices.xlsx', market='DSE')
+
+# Current-day per-minute ticks for a single index (incl. CDSET)
+loader.save_intraday(index='CDSET', file_name='CDSET_intraday.xlsx', market='DSE')
+```
+
+These scrape the *aggregate index* values (not per-company share tables). DSE
+serves the indices in a few different ways, so there are dedicated methods:
+
+| Method | Indices covered | Coverage |
+|--------|-----------------|----------|
+| `save_index_history` / `get_index_history_df` | `DSEX`, `DSES`, `DS30`, `DGEN` | rolling ~30 days by default; **full archive (~2010+) when `start_date`/`end_date` are given** |
+| `save_index_graph` / `get_index_graph_df` | `CDSET`, `DS30` | daily close over the last `months` (CDSET back to ~2016) |
+| `save_current_indices` / `get_current_indices_df` | `DSEX`, `DSES`, `DS30`, `CDSET` | live snapshot |
+| `save_intraday` / `get_intraday_df` | any one of the above (incl. `CDSET`) | current day, ~1-min ticks |
+
+`start_date` / `end_date` accept a `date`/`datetime` or any parseable string
+(e.g. `'2024-01-01'`). Passing only one bounds that side; the other defaults to
+`~2010` (start) or today (end). For `save_index_graph`, `months` is a count
+(e.g. `120` for ~10 years).
+
+> **DSE only; index availability varies by launch date.** `DGEN` is legacy
+> (pre-2013, blank in recent rows); `DSEX`/`DS30` start Jan 2013 and `DSES`
+> starts Jan 2014 in the day-wise archive. `CDSET` is absent from that archive —
+> use `save_index_graph(index='CDSET', ...)` for its daily history. CSE indices
+> are not supported.
+
 #### Create Candlestick charts for analyzing price history-
 
 ```python
@@ -232,6 +278,14 @@ One row per news item, newest first:
 #### Block trades (current day) — `BlockTradeData.save_block_trade_data` *(new in 1.0.0)*
 One row per block transaction for the latest trading day:
 `DATE`, `TRADING_CODE`, `MAX_PRICE`, `MIN_PRICE`, `TRADES`, `QUANTITY`, `VALUE_MN`
+
+#### Market indices — `IndexData`
+| Method | Columns |
+|--------|---------|
+| `save_index_history` | `DATE`, `TOTAL_TRADE`, `TOTAL_VOLUME`, `VALUE_MN`, `MARKET_CAP_MN`, `DSEX`, `DSES`, `DS30`, `DGEN` |
+| `save_index_graph` | `INDEX`, `DATE`, `POINTS` |
+| `save_current_indices` | `INDEX`, `POINTS`, `CHANGE`, `PCT_CHANGE` (one row per index; `CHANGE`/`PCT_CHANGE` are blank for `CDSET`) |
+| `save_intraday` | `INDEX`, `DATETIME`, `POINTS` |
 
 #### Block-trade news proxy — `BlockTradeData.save_block_trade_news_data` → `<symbol>_block_trade_news.xlsx` *(new in 1.0.0)*
 Block-market related disclosures (a filtered view of the news feed):
