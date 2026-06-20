@@ -46,3 +46,8 @@ class HttpScraper(object):
 
     def _get(self, url):
         return self.session.get(url, timeout=self.timeout, verify=self.verify)
+
+    def _post(self, url, data):
+        return self.session.post(
+            url, data=data, timeout=self.timeout, verify=self.verify
+        )
