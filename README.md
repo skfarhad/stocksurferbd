@@ -2,9 +2,10 @@
 This is a Python library based on *beautifulsoup4*, *pandas* &
 *mplfinance*.
 <br> You may use it to download price history and fundamental information of companies from 
-Dhaka Stock Exchange and Chittagong Stock Exchange.
+Dhaka Stock Exchange and Chittagong Stock Exchange, as well as DSE market
+index data (DSEX, DSES, DS30, DGEN, CDSET).
 <br>This can assist you to create further analyses 
-based on fundamental and price history data. 
+based on fundamental, price history and index data. 
 <br>Also create Candlestick charts to analyse the price history of stocks using 
 this easy-to-use wrapper for mplfinance.
 ## Installation

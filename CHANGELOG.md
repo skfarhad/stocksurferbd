@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-06-20
+
+### Added
+- **Market index data** via the new `IndexData` class *(DSE only)*. Scrapes the
+  aggregate index values (DSEX, DSES, DS30, DGEN, CDSET), complementing the
+  per-company scrapers:
+  - `get_index_history_df` / `save_index_history` — day-wise index table.
+    Returns the rolling ~30 days by default, or the **full archive (~2010
+    onward)** when `start_date` / `end_date` are supplied. Index availability
+    varies by launch date (DSEX/DS30 from Jan 2013, DSES from Jan 2014, DGEN is
+    legacy/pre-2013).
+  - `get_index_graph_df` / `save_index_graph` — per-index daily close series by
+    month-count. The only source of **CDSET history (back to ~2016)**; also
+    serves DS30.
+  - `get_current_indices_df` / `save_current_indices` — live snapshot of all
+    four indices, including CDSET.
+  - `get_intraday_df` / `save_intraday` — current-day per-minute ticks for any
+    index, including CDSET.
+- **Tests** — parser tests for `IndexData` with committed DSE HTML/graph
+  fixtures.
+
+### Changed
+- `HttpScraper` gained a `_post` helper (used by the index archive endpoint).
+- README expanded with `IndexData` usage, coverage table, and output schema.
+
+### Notes
+- Backward compatible: existing classes, methods, and signatures are unchanged.
+- Index data is **DSE only**; CSE indices (e.g. CDSET on CSE) are not supported.
+
 ## [1.0.0] - 2026-06-17
 
 ### Added
@@ -36,4 +65,5 @@ All notable changes to this project are documented here. The format is based on
 - Price history and current/live prices remain available for **both DSE and
   CSE**. Fundamentals, news, and block trades are **DSE only**.
 
+[1.1.0]: https://github.com/skfarhad/stocksurferbd/releases/tag/v1.1.0
 [1.0.0]: https://github.com/skfarhad/stocksurferbd/releases/tag/v1.0.0
