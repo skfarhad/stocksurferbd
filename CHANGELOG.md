@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-06-23
+
+### Added
+- **DataFrame accessors on `PriceData`**, bringing it in line with the other
+  loaders (`FundamentalData`, `BlockTradeData`, `IndexData`):
+  - `get_price_history_df(symbol, market, start_date=None, end_date=None)` —
+    daily OHLCV for one symbol. New `start_date` / `end_date` bounds (default
+    `start_date=None`, `end_date=today`) are sent to the DSE day-end archive
+    natively and applied client-side for CSE. DSE history includes the open
+    price (`OPENP`).
+  - `get_current_price_df(market)` — snapshot of all listed symbols.
+  - `get_day_end_df(date=None, market='DSE')` — day-end OHLCV for **all**
+    instruments on a single day, sourced from the DSE day-end archive (so it
+    **includes the open price**, unlike the live current feed). Returns an
+    empty DataFrame before market close / on non-trading days.
+- **Tests** — parser/df tests for `PriceData` with inline DSE/CSE HTML.
+
+### Changed
+- `save_history_data` / `save_current_data` are now thin wrappers over the new
+  df methods (file output unchanged). `save_history_data` gained optional
+  `start_date` / `end_date` parameters.
+- `get_history_url` accepts optional `start_date` / `end_date`; called with no
+  arguments it returns the previous URL unchanged (backward compatible).
+- The day-end archive row parser was extracted to `parse_day_end_archive`
+  (shared by history and day-end) and hardened to return `[]` when the table is
+  absent, instead of raising `AttributeError`.
+
 ## [1.1.0] - 2026-06-20
 
 ### Added
@@ -65,5 +92,6 @@ All notable changes to this project are documented here. The format is based on
 - Price history and current/live prices remain available for **both DSE and
   CSE**. Fundamentals, news, and block trades are **DSE only**.
 
+[1.2.0]: https://github.com/skfarhad/stocksurferbd/releases/tag/v1.2.0
 [1.1.0]: https://github.com/skfarhad/stocksurferbd/releases/tag/v1.1.0
 [1.0.0]: https://github.com/skfarhad/stocksurferbd/releases/tag/v1.0.0

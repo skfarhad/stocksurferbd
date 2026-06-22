@@ -51,6 +51,45 @@ There are 3 parameters for this method-
 2. ```file_name``` : Provide the name of the history data file as string. 
 3. ```market```: Provide the market name as string from which you want to download the data. 
 Probable values are ```'CSE'``` and ```'DSE'```
+4. ```start_date``` / ```end_date``` (optional): Bound the date range. Accept a
+`date`/`datetime` or any parseable string. Defaults are `start_date=None`
+(source default — earliest available) and `end_date=None` (today). For DSE the
+range is sent to the day-end archive natively; for CSE it is applied
+client-side to the ~6-month graph window.
+
+
+#### Getting price data as a pandas DataFrame (instead of a file)-
+
+```python
+from stocksurferbd import PriceData
+
+loader = PriceData()
+
+# Historical OHLCV for one symbol (includes the open price, OPENP).
+hist_df = loader.get_price_history_df('ACI', market='DSE',
+                                      start_date='2026-01-01', end_date='2026-06-22')
+
+# Snapshot of all listed symbols' latest prices.
+current_df = loader.get_current_price_df(market='DSE')
+
+# Day-end OHLCV for ALL instruments on a single day (includes OPENP).
+day_end_df = loader.get_day_end_df(date='2026-06-22', market='DSE')
+```
+
+These mirror the DataFrame-returning methods on `FundamentalData`,
+`BlockTradeData` and `IndexData`. `save_history_data` / `save_current_data`
+are thin wrappers over them, so file output is unchanged.
+
+> Note: the DSE *live* current-price feed does not publish an open price, so
+> `get_current_price_df(market='DSE')` has no `OPENP` column. For DSE open
+> prices use `get_price_history_df` (one symbol, date range) or
+> `get_day_end_df` (all symbols, one day) — both read the day-end archive,
+> which includes `OPENP`. The CSE current feed does include an `OPEN` column.
+>
+> The day-end archive is only populated **after the session closes**, so
+> `get_day_end_df(date=today)` called mid-session (or on a non-trading day)
+> returns an **empty DataFrame**. Use `get_current_price_df` for live intraday
+> prices.
 
 
 #### Downloading current market price data of all listed companies in DSE/CSE-

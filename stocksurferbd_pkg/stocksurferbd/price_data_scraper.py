@@ -27,6 +27,45 @@ class PriceData(HttpScraper):
         return str(datetime.datetime.now().date())
 
     @staticmethod
+    def _fmt_date(value):
+        """Normalise a date input to the ``YYYY-MM-DD`` the form expects.
+
+        Accepts ``None`` (-> ``None``), ``date``/``datetime`` objects, or any
+        parseable string.
+        """
+        if value is None:
+            return None
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            return value.strftime("%Y-%m-%d")
+        return parser.parse(str(value)).strftime("%Y-%m-%d")
+
+    @classmethod
+    def _filter_by_date(cls, records, start_date=None, end_date=None):
+        """Inclusive ``DATE`` range filter for sources without a date query.
+
+        Used for CSE history, whose graph endpoint always returns a fixed
+        window. ``records`` is a list of dicts with a ``DATE`` key; either
+        bound may be ``None``.
+        """
+        start = cls._fmt_date(start_date)
+        end = cls._fmt_date(end_date)
+        if start is None and end is None:
+            return records
+        start_d = parser.parse(start).date() if start else None
+        end_d = parser.parse(end).date() if end else None
+        result = []
+        for rec in records:
+            value = rec['DATE']
+            day = value if isinstance(value, datetime.date) \
+                else parser.parse(str(value)).date()
+            if start_d and day < start_d:
+                continue
+            if end_d and day > end_d:
+                continue
+            result.append(rec)
+        return result
+
+    @staticmethod
     def parse_float(str_val):
         new_val = str_val.replace(
             ',', ''
@@ -53,23 +92,41 @@ class PriceData(HttpScraper):
         df = pd.DataFrame(dict_list)
         df.to_excel(csv_path)
 
-    def get_history_url(self):
-        cur_date = self.get_date()
-        return self.HISTORY_URL_DSE.replace('<date>', cur_date)
+    def get_history_url(self, start_date=None, end_date=None):
+        """Build the DSE day-end archive URL.
 
-    def parse_price_history_dse(self, symbol):
-        full_url = self.get_history_url() + "&inst=" + parse_url.quote(symbol)
-        target_page = self._get(full_url)
-        bs_data = BeautifulSoup(target_page.text, 'html.parser')
-        dict_list = []
-        stock_table = bs_data.find(
+        With no arguments this returns the historical default (``endDate`` =
+        today, no ``startDate``), preserving the previous behaviour. Pass
+        ``start_date`` and/or ``end_date`` (``date``/``datetime`` or any
+        parseable string) to bound the range; a ``startDate`` is only added to
+        the query when ``start_date`` is given.
+        """
+        end = self._fmt_date(end_date) or self.get_date()
+        url = self.HISTORY_URL_DSE.replace('<date>', end)
+        start = self._fmt_date(start_date)
+        if start:
+            url += "&startDate=" + start
+        return url
+
+    def parse_day_end_archive(self, soup):
+        """Parse the DSE day-end archive table (shared by history & day-end).
+
+        The archive serves the same column layout whether queried for one
+        ``inst`` over a date range or for ``All Instrument`` on a single day.
+        Returns ``[]`` when the table is absent (e.g. an unfinished/future date
+        before market close, or a non-trading day) instead of raising.
+        """
+        stock_table = soup.find(
             "table",
             attrs={
                 "class": "table table-bordered background-white shares-table fixedHeader"
             }
         )
-        table_rows = stock_table.find("tbody").find_all("tr")
-        for row in table_rows:
+        tbody = stock_table.find("tbody") if stock_table else None
+        if tbody is None:
+            return []
+        dict_list = []
+        for row in tbody.find_all("tr"):
             row_data = ["".join(td.get_text().split()) for td in row.find_all("td")]
             try:
                 dict_list.append({
@@ -88,6 +145,26 @@ class PriceData(HttpScraper):
             except Exception as e:
                 print(str(e))
         return dict_list
+
+    def parse_price_history_dse(self, symbol, start_date=None, end_date=None):
+        full_url = self.get_history_url(
+            start_date=start_date, end_date=end_date
+        ) + "&inst=" + parse_url.quote(symbol)
+        target_page = self._get(full_url)
+        return self.parse_day_end_archive(
+            BeautifulSoup(target_page.text, 'html.parser')
+        )
+
+    def parse_day_end_dse(self, date=None):
+        """All-instrument day-end rows for a single ``date`` (default today)."""
+        day = self._fmt_date(date) or self.get_date()
+        full_url = self.get_history_url(
+            start_date=day, end_date=day
+        ) + "&inst=" + parse_url.quote("All Instrument")
+        target_page = self._get(full_url)
+        return self.parse_day_end_archive(
+            BeautifulSoup(target_page.text, 'html.parser')
+        )
 
     def parse_current_prices_dse(self, soup, fp_dict=None):
         dict_list = []
@@ -249,29 +326,75 @@ class PriceData(HttpScraper):
 
         return dict_list
 
-    def save_history_data(self, symbol, file_path='', file_name='history_data.csv', market='DSE'):
-        if market == 'DSE':
-            history_list = self.parse_price_history_dse(symbol)
-            full_path = os.path.join(file_path, file_name)
+    def get_price_history_df(self, symbol, market='DSE', start_date=None, end_date=None):
+        """Daily OHLCV history for one symbol as a DataFrame.
 
+        With no dates, returns the source's default window (unchanged
+        behaviour). Pass ``start_date`` and/or ``end_date`` (``date``/
+        ``datetime`` or any parseable string) to bound the range. For DSE the
+        bounds are sent to the day-end archive natively; for CSE, whose graph
+        endpoint serves a fixed ~6-month window, they are applied client-side.
+
+        DSE rows include the open price (``OPENP``); the CSE rows include
+        ``OPENP`` as well.
+        """
+        if market == 'DSE':
+            records = self.parse_price_history_dse(
+                symbol, start_date=start_date, end_date=end_date
+            )
         elif market == 'CSE':
-            history_list = self.parse_price_history_cse(symbol)
-            full_path = os.path.join(file_path, file_name)
+            records = self._filter_by_date(
+                self.parse_price_history_cse(symbol), start_date, end_date
+            )
         else:
             raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
-        self.save_excel(dict_list=history_list, csv_path=full_path)
+        return pd.DataFrame(records)
+
+    def get_day_end_df(self, date=None, market='DSE'):
+        """Day-end OHLCV for **all** instruments on a single ``date``.
+
+        Sourced from the DSE day-end archive, so unlike
+        :meth:`get_current_price_df` this **includes the open price**
+        (``OPENP``). ``date`` defaults to today and accepts a ``date``/
+        ``datetime`` or any parseable string.
+
+        The archive is only populated after the session closes and end-of-day
+        processing runs, so calling this for the current day **before market
+        close** (or for a non-trading day) returns an **empty DataFrame** —
+        use :meth:`get_current_price_df` for live intraday prices.
+        """
+        if market != 'DSE':
+            raise IOError("Only 'DSE' is supported for day-end data.")
+        return pd.DataFrame(self.parse_day_end_dse(date))
+
+    def get_current_price_df(self, market='DSE'):
+        """Snapshot of all listed symbols' latest prices as a DataFrame.
+
+        Note: the DSE live feed does not publish an open price, so the DSE
+        snapshot has no ``OPENP`` column. For DSE open prices use
+        :meth:`get_price_history_df` (the day-end archive includes ``OPENP``).
+        """
+        if market == 'DSE':
+            page = self._get(self.CURRENT_PRICE_URL_DSE)
+            records = self.parse_current_prices_dse(
+                BeautifulSoup(page.text, 'html.parser')
+            )
+        elif market == 'CSE':
+            page = self._get(self.CURRENT_PRICE_URL_CSE)
+            records = self.parse_current_prices_cse(
+                BeautifulSoup(page.text, 'html.parser')
+            )
+        else:
+            raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
+        return pd.DataFrame(records)
+
+    def save_history_data(self, symbol, file_path='', file_name='history_data.csv',
+                          market='DSE', start_date=None, end_date=None):
+        rows = self.get_price_history_df(
+            symbol, market=market, start_date=start_date, end_date=end_date
+        ).to_dict('records')
+        self.save_excel(dict_list=rows, csv_path=os.path.join(file_path, file_name))
 
     def save_current_data(self, file_path='', file_name='dsebd_current_data.csv', market='DSE'):
-        if market == 'DSE':
-            target_page = self._get(self.CURRENT_PRICE_URL_DSE)
-            bs_data = BeautifulSoup(target_page.text, 'html.parser')
-            current_data = self.parse_current_prices_dse(bs_data)
-            full_path = os.path.join(file_path, file_name)
-        elif market == 'CSE':
-            target_page = self._get(self.CURRENT_PRICE_URL_CSE)
-            bs_data = BeautifulSoup(target_page.text, 'html.parser')
-            current_data = self.parse_current_prices_cse(bs_data)
-            full_path = os.path.join(file_path, file_name)
-        else:
-            raise IOError('Invalid Stock Market! Possible values are- CSE, DSE')
-        self.save_excel(dict_list=current_data, csv_path=full_path)
+        rows = self.get_current_price_df(market=market).to_dict('records')
+        self.save_excel(dict_list=rows, csv_path=os.path.join(file_path, file_name))
