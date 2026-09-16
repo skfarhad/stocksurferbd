@@ -184,8 +184,8 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 - [x] Keep "DSE only" notes for `FundamentalData` and `BlockTradeData`.
 
 **5.2 Version and changelog**
-- [x] `setup.py` and `pyproject.toml` -> `1.3.0`.
-- [x] `CHANGELOG.md` `[1.3.0]` entry (Added / Changed / Breaking for CSE-only callers).
+- [x] `setup.py` and `pyproject.toml` -> `2.0.0`.
+- [x] `CHANGELOG.md` `[2.0.0]` entry (Added / Changed / Breaking for CSE-only callers).
 
 **5.3 Example script**
 - [x] `fetch_csebd_data.py`: `pd.read_excel`, `HISTORY_FOLDER = 'cse_history_data'`, `PriceData(cache_dir='cse_cache')`; fetch with one `get_day_end_range_df(CSE_EARLIEST_DATE, today, market='CSE', progress=True)` and write one `<SYM>_history_data.xlsx` per `TRADING_CODE` group instead of a per-symbol request loop.

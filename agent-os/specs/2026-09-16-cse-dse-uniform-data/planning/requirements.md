@@ -114,7 +114,7 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
 - Compatibility: DSE outputs unchanged (regression tests on existing fixtures).
   Existing CSE callers get the same column names as DSE; this is a deliberate
   breaking change for CSE-only callers and is called out in the changelog with
-  a version bump (1.3.0; 1.2.0 is already tagged).
+  a version bump (2.0.0; 1.2.0 is already tagged).
 - Dependencies: add `openpyxl` (already the pandas Excel engine used by
   `to_excel`) to install requirements explicitly.
 

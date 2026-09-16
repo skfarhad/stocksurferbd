@@ -40,7 +40,7 @@ session cookie and a `Referer`.
 - **In Scope**: `PriceData` (history, current, day-end) and `IndexData`
   (current snapshot, day-wise history) for `market='CSE'`; CSRF-aware POST
   helper in `HttpScraper`; offline fixtures and tests; README schema tables;
-  `fetch_csebd_data.py` fix; version bump to 1.3.0.
+  `fetch_csebd_data.py` fix; version bump to 2.0.0.
 - **Out of Scope**: `FundamentalData` / `BlockTradeData` for CSE; CSE intraday
   ticks and per-index graph history; SME/ATB/G-Sec boards; sector indices;
   any change to DSE output; a `MARKET` column.
@@ -234,8 +234,8 @@ Also introduce the small exception hierarchy the standards call for
 | `stocksurferbd_pkg/stocksurferbd/utils.py` | exceptions, `post_with_csrf`, `read_xlsx_bytes` |
 | `stocksurferbd_pkg/stocksurferbd/price_data_scraper.py` | CSE URL constants, column constants, `cache_dir` ctor arg, `_cse_day_end_frame` (year chunks, memory + disk cache, progress), `get_day_end_range_df` + `save_day_end_range_data` (both markets), `parse_current_prices_cse` reshape, `get_day_end_df` CSE; remove chart-based `parse_price_history_cse`, `HISTORY_URL_CSE`, `_filter_by_date` |
 | `stocksurferbd_pkg/stocksurferbd/index_data_scraper.py` | `CSE_INDICES`, CSE current + history, market guards |
-| `stocksurferbd_pkg/setup.py`, `stocksurferbd_pkg/pyproject.toml` | version 1.3.0 |
-| `CHANGELOG.md`, `README.md` | 1.3.0 entry; one schema table per method; CSE notes |
+| `stocksurferbd_pkg/setup.py`, `stocksurferbd_pkg/pyproject.toml` | version 2.0.0 |
+| `CHANGELOG.md`, `README.md` | 2.0.0 entry; one schema table per method; CSE notes |
 | `fetch_csebd_data.py` | `read_excel`; reuse one `PriceData` (cache) |
 | `tests/fixtures/cse_*` | trimmed xlsx/HTML/JSON fixtures |
 | `tests/conftest.py`, `tests/test_price_data.py`, `tests/test_index_data.py`, `tests/test_utils.py` | CSE tests |
@@ -322,7 +322,8 @@ way the join-with-fallback design holds, but the README wording depends on it.
 ---
 
 ## Rollout
-- Version `1.2.0 -> 1.3.0` (1.2.0 is tagged).
+- Version `1.2.0 -> 2.0.0`: public members were removed and CSE output columns
+  changed, so semver calls for a major bump even though DSE is untouched.
 - Changelog: CSE outputs now match DSE schemas; CSE history re-sourced (real
   open, LTP, YCP, trades, value; full archive from 2015-11-24 by default);
   new `get_day_end_range_df` / `save_day_end_range_data` for both markets;

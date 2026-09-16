@@ -4,50 +4,67 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
-## [1.3.0] - 2026-09-16
+## [2.0.0] - 2026-09-16
+
+**CSE data now comes back in the same shape as DSE data.** Code written against
+DSE output works for `market='CSE'` with no changes. DSE output is untouched.
+
+### Breaking changes (CSE callers only)
+- **CSE price history columns changed** to the DSE set. The CSE-only
+  `% CHANGE` column is gone, and the column order now matches DSE:
+  `DATE, TRADING_CODE, LTP, HIGH, LOW, OPENP, CLOSEP, YCP, TRADE, VALUE_MN, VOLUME`.
+- **CSE current-price columns changed** to the DSE set. The CSE-only `OPEN`
+  column is gone and `CLOSEP` / `% CHANGE` are now present:
+  `DATE, TRADING_CODE, LTP, HIGH, LOW, CLOSEP, YCP, % CHANGE, TRADE, VALUE_MN, VOLUME`.
+  For the open price use `get_price_history_df` or `get_day_end_df`.
+- **`PriceData.parse_price_history_cse`, `PriceData._filter_by_date` and
+  `PriceData.HISTORY_URL_CSE` were removed** along with the 6-month chart
+  scraper they belonged to. Use `get_price_history_df(symbol, market='CSE')`.
+- `% CHANGE` is the absolute change `LTP - YCP` for both markets. This is what
+  the DSE live feed publishes under that name, verified against 395 live rows.
+
+### Fixed
+- **CSE `OPENP` was not the open price.** The old chart source put the
+  *previous close* there (confirmed on 115 of 115 consecutive rows). CSE now
+  reports the exchange's real open, and `YCP` carries the previous close.
+- **CSE `LTP`, `YCP`, `% CHANGE`, `TRADE` and `VALUE_MN` were hard-coded
+  zeros** in history rows. All five now carry real values.
+- **CSE current-price `DATE` came from the machine clock**, so a weekend or
+  holiday call produced a date the exchange never traded. It now comes from the
+  exchange's own day-end data, falling back to the last trade date on the site.
+- **CSE price history was capped at about 6 months.** It now reaches back to
+  2015-11-24, the earliest date the exchange serves (with gaps before mid-2018).
 
 ### Added
-- **CSE output now matches the DSE schema exactly** (columns, order, dtypes,
-  newest-first ordering) for `get_price_history_df`, `get_current_price_df`
-  and `get_day_end_df`, so DSE-based code works for `market='CSE'` unchanged.
-- **CSE price history is re-sourced** from the exchange's day-end download.
-  `OPENP`, `LTP`, `YCP`, `TRADE` and `VALUE_MN` now carry real values (the
-  old chart source put the *previous close* in `OPENP` and zeros in the rest)
-  and the archive reaches back to **2015-11-24** instead of ~6 months. With no
-  dates the full archive is returned.
-- `get_day_end_df(date, market='CSE')` for all CSE symbols on one day.
+- **`get_day_end_df(date, market='CSE')`** for all CSE symbols on one day.
 - **`get_day_end_range_df` / `save_day_end_range_data`** (both markets): all
-  symbols over a date range, with `symbols`, `chunk` (`'year'`/`'month'`),
+  symbols over a date range, with `symbols`, `chunk` (`'year'` or `'month'`),
   `progress` (bool or callback) and `use_cache` options. This is the efficient
-  way to pull many CSE symbols.
-- `PriceData(cache_dir=...)`: optional on-disk cache of closed CSE download
-  chunks; chunks are also cached per instance, so a loop over symbols downloads
-  each period once.
-- **`IndexData` supports CSE**: `get_current_indices_df` / `get_index_history_df`
-  for CASPI, CSE30, CSCX, CSE50 and CSI with the DSE frame shapes.
-- `HttpScraper.post_with_csrf` / `get_csrf_token` and `read_xlsx_bytes`
-  helpers; `StockSurferError`, `FetchError`, `ParseError` exceptions
-  (exported from the package).
-- Offline CSE fixtures and tests (`tests/fixtures/cse_*`).
+  way to pull many CSE symbols, since CSE publishes one spreadsheet covering
+  every symbol per date range.
+- **`PriceData(cache_dir=...)`**: optional on-disk cache of closed CSE download
+  chunks. Chunks are also cached per instance, so a loop over symbols downloads
+  each period once instead of once per symbol.
+- **`IndexData` supports CSE**: `get_current_indices_df` and
+  `get_index_history_df` cover CASPI, CSE30, CSCX, CSE50 and CSI, returning the
+  same frame shapes as the DSE equivalents.
+- `HttpScraper.get_csrf_token` / `post_with_csrf` and `read_xlsx_bytes` helpers
+  for the CSE form endpoints.
+- `StockSurferError`, `FetchError` and `ParseError`, exported from the package.
+- Offline CSE test fixtures and 44 new tests (82 total, up from 38).
 
 ### Changed
-- CSE `get_current_price_df` takes `DATE` and `CLOSEP` from the exchange's
-  same-day day-end download instead of the machine clock / a missing column;
-  `% CHANGE` is computed as the absolute change `LTP - YCP`, which is what the
-  DSE live feed publishes under that name.
-- Market arguments are validated against `VALID_MARKETS` (case-insensitive) on
+- Market arguments are validated against `VALID_MARKETS` case-insensitively on
   every market-taking method.
-- `fetch_csebd_data.py` pulls the CSE archive once with
-  `get_day_end_range_df` and splits it per symbol.
+- `IndexData.get_index_graph_df` and `get_intraday_df` raise a message naming
+  the CSE alternative, since CSE publishes no intraday or per-index graph data.
+- `fetch_csebd_data.py` pulls the CSE archive once with `get_day_end_range_df`
+  and splits it per symbol, instead of one request per symbol.
 
-### Removed (breaking for CSE-only callers)
-- The CSE `OPEN` column in current prices and the `% CHANGE` column in CSE
-  history; both markets now share the DSE columns.
-- `PriceData.parse_price_history_cse`, `PriceData._filter_by_date` and
-  `HISTORY_URL_CSE` (the 6-month chart scraper).
-
-### Notes
-- DSE output is unchanged.
+### Still DSE only
+- `FundamentalData` (company data, financials, news) and `BlockTradeData`. CSE
+  publishes no EPS/NAV/dividend history, no news feed and no block-trade page.
+- `IndexData.get_index_graph_df` and `get_intraday_df`.
 
 ## [1.2.0] - 2026-06-23
 
