@@ -1,0 +1,11 @@
+task_groups:
+  - name: HTTP plumbing and fixtures
+    claude_code_subagent: general-purpose
+  - name: PriceData CSE history and day-end
+    claude_code_subagent: general-purpose
+  - name: PriceData CSE current prices
+    claude_code_subagent: general-purpose
+  - name: IndexData CSE
+    claude_code_subagent: general-purpose
+  - name: Docs, version, example script
+    claude_code_subagent: general-purpose

@@ -14,6 +14,12 @@ The library scrapes the public DSE/CSE websites, normalises the tables with `pan
 4. [x] **Year-wise financial performance (DSE)** — EPS/NAV/PE/dividend history, written to `<symbol>_financial_data.xlsx`.
 5. [x] **Candlestick plotting** — `CandlestickPlot.show_plot` — `mplfinance` wrapper with optional multi-day resampling.
 6. [x] **Excel output** — all fetchers persist to `.xlsx` via `pandas` + `openpyxl`.
+7. [x] **CSE/DSE uniform price & index data (2.0.0, 2026-09-16)** — CSE price
+   history/day-end/current and `IndexData` return the exact DSE schemas; CSE
+   history is sourced from the exchange day-end download (archive from
+   2015-11-24, chunked + cached, optional `cache_dir`); new
+   `get_day_end_range_df` bulk method for both markets. Spec:
+   `agent-os/specs/2026-09-16-cse-dse-uniform-data/`.
 
 ## Phase 1: Wider fundamental coverage
 
@@ -55,4 +61,7 @@ Tests, typing, and CI keep the library trustworthy as coverage grows.
 ## Open Decisions
 - Whether DSE/CSE expose a stable, scrapeable source for block/spot trades and circuit-band data (gates Phase 1 §9–10).
 - Whether to keep `.xlsx` as the default output or move to returning `DataFrame`s with optional file export (Phase 2 §14).
-- How much CSE parity to commit to, given CSE's different page structure.
+- ~~How much CSE parity to commit to~~ — resolved in 2.0.0 for prices and
+  indices (DSE shape is canonical). CSE fundamentals remain open (Phase 1 §11):
+  the CSE company page has capital/sector/shareholding data but no EPS/NAV/
+  dividend history or news; no CSE block-trade source was found.

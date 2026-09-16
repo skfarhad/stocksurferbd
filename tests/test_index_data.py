@@ -134,3 +134,102 @@ def test_parse_intraday_unknown_index():
 def test_invalid_market_raises(call):
     with pytest.raises(IOError):
         call(IndexData())
+
+
+# --------------------------------------------------------------------------- #
+# CSE: live snapshot (JSON) and day-wise history (xlsx download)
+# --------------------------------------------------------------------------- #
+import io  # noqa: E402
+
+
+def test_parse_index_summary_cse(cse_index_json):
+    rec = IndexData.parse_index_summary_cse("CASPI", cse_index_json["CASPI"])
+    assert list(rec) == IndexData.INDEX_CURRENT_COLUMNS
+    assert rec["INDEX"] == "CASPI"
+    assert all(isinstance(rec[k], float) for k in ("POINTS", "CHANGE", "PCT_CHANGE"))
+
+
+def test_parse_index_summary_cse_nulls_and_bad_json():
+    rec = IndexData.parse_index_summary_cse("csi", '{"value": null, "change": null, "percentage_change": null}')
+    assert rec == {"INDEX": "CSI", "POINTS": None, "CHANGE": None, "PCT_CHANGE": None}
+    with pytest.raises(Exception):
+        IndexData.parse_index_summary_cse("CSI", "<html>login</html>")
+
+
+def test_get_current_indices_df_cse(monkeypatch, cse_index_json):
+    loader = IndexData()
+    posted = []
+    monkeypatch.setattr(loader, "get_csrf_token", lambda page: "tok")
+
+    def fake_post(page_url, action_url, data, token=None):
+        posted.append((data["selected_index"], token))
+        return type("R", (), {"text": cse_index_json[data["selected_index"]]})()
+
+    monkeypatch.setattr(loader, "post_with_csrf", fake_post)
+    df = loader.get_current_indices_df(market="CSE")
+    assert list(df.columns) == IndexData.INDEX_CURRENT_COLUMNS
+    assert df["INDEX"].tolist() == list(IndexData.CSE_INDICES)
+    assert all(tok == "tok" for _, tok in posted)            # token fetched once, reused
+    assert df["POINTS"].gt(0).all()
+
+
+def test_parse_index_history_cse(cse_index_history_bytes):
+    records = IndexData.parse_index_history_cse(pd.read_excel(io.BytesIO(cse_index_history_bytes)))
+    df = pd.DataFrame(records, columns=list(IndexData._CSE_HISTORY_COLUMNS))
+    assert list(df.columns)[:5] == list(IndexData._HISTORY_COLUMNS)[:5]   # same leading columns as DSE
+    assert list(df.columns)[5:] == list(IndexData.CSE_INDICES)
+    assert len(df) == 4
+    dates = df["DATE"].tolist()
+    assert all(isinstance(d, datetime.date) for d in dates) and dates == sorted(dates, reverse=True)
+    top = df.iloc[0]
+    assert top["DATE"] == datetime.date(2026, 9, 15)
+    assert top["CASPI"] == 14598.4513 and top["CSE30"] == 13455.4969
+    assert top["TOTAL_TRADE"] == 1319 and top["TOTAL_VOLUME"] == 7078473
+    assert top["VALUE_MN"] == 192.06                          # 192,059,977.2 Taka -> millions
+    assert top["MARKET_CAP_MN"] == 9450547.53
+
+
+def test_parse_index_history_cse_missing_columns():
+    with pytest.raises(Exception):
+        IndexData.parse_index_history_cse(pd.DataFrame({"trade_date": ["2026-01-01"]}))
+
+
+def test_get_index_history_df_cse(monkeypatch, cse_index_history_bytes):
+    loader = IndexData()
+    calls = []
+
+    def fake_post(page_url, action_url, data, token=None):
+        calls.append(data)
+        return type("R", (), {"content": cse_index_history_bytes,
+                              "headers": {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}})()
+
+    monkeypatch.setattr(loader, "post_with_csrf", fake_post)
+    df = loader.get_index_history_df(market="CSE", start_date="2026-09-10", end_date="2026-09-15")
+    assert calls == [{"from": "2026-09-10", "to": "2026-09-15"}]
+    assert list(df.columns) == list(IndexData._CSE_HISTORY_COLUMNS)
+    # No dates -> rolling window ending today, like the DSE default table.
+    loader.get_index_history_df(market="CSE")
+    today = datetime.date.today()
+    assert calls[-1]["to"] == today.isoformat()
+    assert calls[-1]["from"] == (today - datetime.timedelta(days=IndexData.CSE_DEFAULT_HISTORY_DAYS)).isoformat()
+
+
+@pytest.mark.parametrize("call", [
+    lambda ld: ld.get_index_history_df(market="NYSE"),
+    lambda ld: ld.get_current_indices_df(market="NYSE"),
+    lambda ld: ld.get_index_graph_df(market="NYSE"),
+    lambda ld: ld.get_intraday_df(market="NYSE"),
+])
+def test_index_invalid_market_raises(call):
+    with pytest.raises(IOError):
+        call(IndexData())
+
+
+@pytest.mark.parametrize("call", [
+    lambda ld: ld.get_index_graph_df(index="CDSET", market="CSE"),
+    lambda ld: ld.get_intraday_df(index="DSEX", market="CSE"),
+])
+def test_index_cse_unsupported_methods_name_alternative(call):
+    with pytest.raises(IOError) as exc:
+        call(IndexData())
+    assert "CSE" in str(exc.value) and "get_" in str(exc.value)

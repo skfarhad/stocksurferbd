@@ -3,7 +3,11 @@
 __author__ = "Sk Farhad"
 __copyright__ = "Copyright (c) 2024 The Python Packaging Authority"
 
-"""Scraper for DSE market indices (DSEX, DSES, DS30, DGEN, CDSET).
+"""Scraper for DSE and CSE market indices.
+
+DSE: DSEX, DSES, DS30, DGEN, CDSET. CSE: CASPI, CSE30, CSCX, CSE50, CSI.
+Both markets return the same frame shapes (the DSE ones); only the
+market-specific index columns differ in name.
 
 Unlike :class:`PriceData`, which targets per-company share tables, this loader
 reads the aggregate *index* values published by DSE. DSE serves the indices in a
@@ -21,20 +25,27 @@ few different ways, so there are dedicated methods:
   box on the home page. Covers ``DSEX``, ``DSES``, ``DS30`` **and** ``CDSET``.
 * ``get_intraday_df`` / ``save_intraday`` -- the per-minute series behind the
   home-page graph, for any single index including ``CDSET`` (current day only).
+
+CSE serves ``get_current_indices_df`` (live JSON per index) and
+``get_index_history_df`` (xlsx download by date range). CSE has no intraday
+or per-index graph source, so those two methods are DSE only.
 """
 
 import os
 import re
+import json
 import datetime
 
 import pandas as pd
 from dateutil import parser
 from bs4 import BeautifulSoup
 
-from .utils import HttpScraper, parse_float, parse_int
+from .utils import HttpScraper, ParseError, parse_float, parse_int, read_xlsx_bytes
 
 
 class IndexData(HttpScraper):
+    VALID_MARKETS = ("DSE", "CSE")
+
     # Rolling ~30-day table (no date range).
     INDEX_HISTORY_URL_DSE = "https://www.dsebd.org/recent_market_information.php"
     # Same table, but accepts a startDate/endDate POST -> full archive (2010+).
@@ -44,6 +55,35 @@ class IndexData(HttpScraper):
     GRAPH_URL_DSE = "https://www.dsebd.org/php_graph/monthly_graph_index.php"
 
     SUPPORTED_INDICES = ("DSEX", "DSES", "DS30", "CDSET")
+
+    # ---- CSE -------------------------------------------------------------
+    HOME_URL_CSE = "https://www.cse.com.bd/"
+    # Live value/change/pct for one index; POST {selected_index, csrf_cse_token}.
+    INDEX_SUMMARY_URL_CSE = "https://www.cse.com.bd/home/load__index_summary/"
+    HISTORICAL_DATA_PAGE_CSE = "https://www.cse.com.bd/market/historicaldata"
+    # Day-wise index values + market totals as xlsx; POST {from, to, csrf_cse_token}.
+    DOWNLOAD_INDEX_URL_CSE = "https://www.cse.com.bd/market/data_download_index"
+    CSE_INDICES = ("CASPI", "CSE30", "CSCX", "CSE50", "CSI")
+    # Default window for CSE history with no dates: mirrors DSE's rolling ~30 days.
+    CSE_DEFAULT_HISTORY_DAYS = 30
+
+    INDEX_CURRENT_COLUMNS = ["INDEX", "POINTS", "CHANGE", "PCT_CHANGE"]
+    # Leading columns match the DSE day-wise table; then one column per CSE index.
+    _CSE_HISTORY_COLUMNS = (
+        "DATE", "TOTAL_TRADE", "TOTAL_VOLUME", "VALUE_MN", "MARKET_CAP_MN",
+    ) + CSE_INDICES
+    _CSE_HISTORY_COLUMN_MAP = {
+        "trade_date": "DATE",
+        "no_of_trades": "TOTAL_TRADE",
+        "volume": "TOTAL_VOLUME",
+        "turnover": "VALUE_MN",
+        "market_capital": "MARKET_CAP_MN",
+        "caspi_value": "CASPI",
+        "cse30_value": "CSE30",
+        "cscx_value": "CSCX",
+        "cse50_value": "CSE50",
+        "csi_value": "CSI",
+    }
 
     # Indices the graph endpoint serves, mapped to its 'type' query value.
     # CDSET is only available here (it has no column in the day-wise archive).
@@ -75,6 +115,23 @@ class IndexData(HttpScraper):
     @staticmethod
     def save_excel(dict_list, file_path):
         pd.DataFrame(dict_list).to_excel(file_path)
+
+    @classmethod
+    def _check_market(cls, market):
+        market = str(market).strip().upper()
+        if market not in cls.VALID_MARKETS:
+            raise IOError("Invalid Stock Market! Possible values are- CSE, DSE")
+        return market
+
+    @classmethod
+    def _dse_only(cls, market, what, alternative):
+        market = cls._check_market(market)
+        if market != "DSE":
+            raise IOError(
+                f"Only 'DSE' is supported for {what}; CSE publishes no such "
+                f"source. {alternative}"
+            )
+        return market
 
     # ------------------------------------------------------------------ #
     # Day-wise history (DSEX / DSES / DS30 / DGEN)
@@ -152,14 +209,23 @@ class IndexData(HttpScraper):
         return self.parse_index_history(BeautifulSoup(page.text, "html.parser"))
 
     def get_index_history_df(self, market="DSE", start_date=None, end_date=None):
-        """Day-wise index values (DSEX/DSES/DS30/DGEN) as a DataFrame.
+        """Day-wise index values as a DataFrame.
 
-        With no dates, returns the rolling ~30-day table. Pass ``start_date``
+        The leading columns ``DATE, TOTAL_TRADE, TOTAL_VOLUME, VALUE_MN,
+        MARKET_CAP_MN`` are identical for both markets, followed by one column
+        per index: ``DSEX, DSES, DS30, DGEN`` for DSE or
+        ``CASPI, CSE30, CSCX, CSE50, CSI`` for CSE. Rows are newest first.
+
+        With no dates, returns the rolling ~30-day window. Pass ``start_date``
         and/or ``end_date`` (``date``/``datetime`` or any parseable string) to
-        pull the full DSE archive (data available from ~2010 onward).
+        pull the archive (DSE from ~2010, CSE from late 2015).
         """
-        if market != "DSE":
-            raise IOError("Only 'DSE' is supported for index data.")
+        market = self._check_market(market)
+        if market == "CSE":
+            return pd.DataFrame(
+                self.parse_index_history_cse_range(start_date, end_date),
+                columns=list(self._CSE_HISTORY_COLUMNS),
+            )
         return pd.DataFrame(
             self.parse_index_history_dse(start_date=start_date, end_date=end_date)
         )
@@ -214,14 +280,104 @@ class IndexData(HttpScraper):
         return self.parse_current_indices(self._get(self.HOME_URL_DSE).text)
 
     def get_current_indices_df(self, market="DSE"):
-        """Live snapshot of DSEX/DSES/DS30/CDSET as a DataFrame."""
-        if market != "DSE":
-            raise IOError("Only 'DSE' is supported for index data.")
+        """Live snapshot of all indices as ``INDEX, POINTS, CHANGE, PCT_CHANGE``.
+
+        DSE: DSEX/DSES/DS30/CDSET. CSE: CASPI/CSE30/CSCX/CSE50/CSI.
+        """
+        market = self._check_market(market)
+        if market == "CSE":
+            return pd.DataFrame(
+                self.parse_current_indices_cse(), columns=self.INDEX_CURRENT_COLUMNS
+            )
         return pd.DataFrame(self.parse_current_indices_dse())
 
     def save_current_indices(self, file_path="", file_name="current_indices.xlsx", market="DSE"):
         rows = self.get_current_indices_df(market=market).to_dict("records")
         self.save_excel(rows, os.path.join(file_path, file_name))
+
+    # ------------------------------------------------------------------ #
+    # CSE: live snapshot (JSON per index) and day-wise history (xlsx)
+    # ------------------------------------------------------------------ #
+    @classmethod
+    def parse_index_summary_cse(cls, index, json_text):
+        """One ``INDEX, POINTS, CHANGE, PCT_CHANGE`` record from the CSE JSON."""
+        index = index.upper()
+        try:
+            data = json.loads(json_text)
+        except ValueError as e:
+            raise ParseError(f"CSE index summary for {index} is not JSON: {e}") from e
+        if not isinstance(data, dict) or "value" not in data:
+            raise ParseError(
+                f"CSE index summary for {index} has no 'value' field: {data!r}"
+            )
+
+        def num(key):
+            raw = data.get(key)
+            return None if raw in (None, "", "null") else cls._num(str(raw))
+
+        return {
+            "INDEX": index,
+            "POINTS": num("value"),
+            "CHANGE": num("change"),
+            "PCT_CHANGE": num("percentage_change"),
+        }
+
+    def parse_current_indices_cse(self):
+        # One token serves all five POSTs (same session/cookie).
+        token = self.get_csrf_token(self.HOME_URL_CSE)
+        records = []
+        for index in self.CSE_INDICES:
+            resp = self.post_with_csrf(
+                self.HOME_URL_CSE, self.INDEX_SUMMARY_URL_CSE,
+                {"selected_index": index}, token=token,
+            )
+            records.append(self.parse_index_summary_cse(index, resp.text))
+        return records
+
+    @classmethod
+    def parse_index_history_cse(cls, df):
+        """Reshape the CSE index download into the DSE day-wise layout.
+
+        ``turnover`` and ``market_capital`` (Taka) become millions like the DSE
+        ``VALUE_MN`` / ``MARKET_CAP_MN`` columns. Rows are newest first.
+        """
+        missing = set(cls._CSE_HISTORY_COLUMN_MAP) - set(df.columns)
+        if missing:
+            raise ParseError(
+                "CSE index download is missing columns "
+                f"{sorted(missing)}; the spreadsheet layout may have changed."
+            )
+        records = []
+        for _, row in df.iterrows():
+            records.append({
+                "DATE": parser.parse(str(row["trade_date"])).date(),
+                "TOTAL_TRADE": int(row["no_of_trades"]),
+                "TOTAL_VOLUME": int(row["volume"]),
+                "VALUE_MN": round(float(row["turnover"]) / 1e6, 3),
+                "MARKET_CAP_MN": round(float(row["market_capital"]) / 1e6, 3),
+                **{
+                    cls._CSE_HISTORY_COLUMN_MAP[col]: float(row[col])
+                    for col in ("caspi_value", "cse30_value", "cscx_value",
+                                "cse50_value", "csi_value")
+                },
+            })
+        records.sort(key=lambda r: r["DATE"], reverse=True)
+        return records
+
+    def parse_index_history_cse_range(self, start_date=None, end_date=None):
+        end = self._fmt_date(end_date) or datetime.date.today().strftime("%Y-%m-%d")
+        start = self._fmt_date(start_date) or (
+            parser.parse(end).date() - datetime.timedelta(days=self.CSE_DEFAULT_HISTORY_DAYS)
+        ).strftime("%Y-%m-%d")
+        resp = self.post_with_csrf(
+            self.HISTORICAL_DATA_PAGE_CSE, self.DOWNLOAD_INDEX_URL_CSE,
+            {"from": start, "to": end},
+        )
+        df = read_xlsx_bytes(
+            resp.content, resp.headers.get("content-type", ""),
+            source=f"CSE index download {start}..{end}",
+        )
+        return self.parse_index_history_cse(df)
 
     # ------------------------------------------------------------------ #
     # Daily close history for CDSET / DS30 (graph endpoint, by month-count)
@@ -252,10 +408,10 @@ class IndexData(HttpScraper):
         """Daily close history for CDSET or DS30 over the last ``months``.
 
         This is the only source of historical CDSET values (data goes back to
-        ~2016). ``months`` is a count, e.g. ``120`` for ~10 years.
+        ~2016). ``months`` is a count, e.g. ``120`` for ~10 years. DSE only.
         """
-        if market != "DSE":
-            raise IOError("Only 'DSE' is supported for index data.")
+        self._dse_only(market, "per-index graph history",
+                       "For CSE use get_index_history_df(market='CSE', start_date=..., end_date=...).")
         return pd.DataFrame(self.parse_index_graph_dse(index, months))
 
     def save_index_graph(self, index="CDSET", months=12, file_path="",
@@ -295,9 +451,9 @@ class IndexData(HttpScraper):
         return self.parse_intraday(self._get(self.HOME_URL_DSE).text, index)
 
     def get_intraday_df(self, index="DSEX", market="DSE"):
-        """Current-day per-minute ticks for one index (DSEX/DSES/DS30/CDSET)."""
-        if market != "DSE":
-            raise IOError("Only 'DSE' is supported for index data.")
+        """Current-day per-minute ticks for one index (DSEX/DSES/DS30/CDSET). DSE only."""
+        self._dse_only(market, "intraday index ticks",
+                       "For CSE use get_current_indices_df(market='CSE') for the live values.")
         return pd.DataFrame(self.parse_intraday_dse(index))
 
     def save_intraday(self, index="DSEX", file_path="", file_name=None, market="DSE"):
