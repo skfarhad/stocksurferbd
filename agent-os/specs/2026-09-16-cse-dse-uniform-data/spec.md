@@ -1,6 +1,6 @@
 # Feature Specification: CSE/DSE Uniform Data
 
-**Status:** Planned (2026-09-16)
+**Status:** Implemented (2026-09-16); see `tasks.md` session notes
 
 ## Overview
 

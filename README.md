@@ -2,8 +2,10 @@
 This is a Python library based on *beautifulsoup4*, *pandas* &
 *mplfinance*.
 <br> You may use it to download price history and fundamental information of companies from 
-Dhaka Stock Exchange and Chittagong Stock Exchange, as well as DSE market
-index data (DSEX, DSES, DS30, DGEN, CDSET).
+Dhaka Stock Exchange and Chittagong Stock Exchange, as well as market
+index data (DSE: DSEX, DSES, DS30, DGEN, CDSET; CSE: CASPI, CSE30, CSCX, CSE50, CSI).
+<br>**Data from both exchanges comes back in the same shape** (columns, order
+and types), so an application written against DSE output works for CSE unchanged.
 <br>This can assist you to create further analyses 
 based on fundamental, price history and index data. 
 <br>Also create Candlestick charts to analyse the price history of stocks using 
@@ -29,6 +31,14 @@ loader = PriceData(verify=False, session=None, timeout=60)
 Defaults (`verify=True`, a fresh `requests.Session`, 30s timeout) preserve the
 previous behaviour.
 
+`PriceData` also accepts `cache_dir=None`. When set, closed CSE download chunks
+(past years/months) are stored there as pandas pickles and reused by later
+instances and processes, so a full CSE history is downloaded once per machine:
+
+```python
+loader = PriceData(cache_dir='cse_cache')
+```
+
 ## Usage
 
 #### Downloading historical price data of a single stock-
@@ -52,10 +62,19 @@ There are 3 parameters for this method-
 3. ```market```: Provide the market name as string from which you want to download the data. 
 Probable values are ```'CSE'``` and ```'DSE'```
 4. ```start_date``` / ```end_date``` (optional): Bound the date range. Accept a
-`date`/`datetime` or any parseable string. Defaults are `start_date=None`
-(source default — earliest available) and `end_date=None` (today). For DSE the
-range is sent to the day-end archive natively; for CSE it is applied
-client-side to the ~6-month graph window.
+`date`/`datetime` or any parseable string. Defaults are `start_date=None` and
+`end_date=None` (today). With no `start_date`, **DSE** returns the window its
+archive serves by default (about 2 years; a DSE server limit), while **CSE**
+returns its **full archive from 2015-11-24** (with gaps before mid-2018).
+
+> **How CSE history is fetched.** CSE does not publish per-symbol history; it
+> publishes one spreadsheet of *all* symbols per date range. The library
+> therefore downloads calendar-year chunks (about 95k rows / 4 MB / 20 s each),
+> caches them on the `PriceData` instance (and in `cache_dir` if set) and
+> filters to the symbol you asked for. The first CSE symbol with no dates costs
+> ~11 downloads (3-4 minutes); every further symbol on the same instance is
+> served from the cache in well under a second. For many symbols use
+> `get_day_end_range_df` once and split by `TRADING_CODE` (see below).
 
 
 #### Getting price data as a pandas DataFrame (instead of a file)-
@@ -74,22 +93,51 @@ current_df = loader.get_current_price_df(market='DSE')
 
 # Day-end OHLCV for ALL instruments on a single day (includes OPENP).
 day_end_df = loader.get_day_end_df(date='2026-06-22', market='DSE')
+
+# Day-end OHLCV for ALL instruments over a date range (both markets).
+# This is the efficient way to pull many CSE symbols: one download per chunk.
+range_df = loader.get_day_end_range_df('2020-01-01', '2026-06-22', market='CSE')
+for symbol, frame in range_df.groupby('TRADING_CODE'):
+    frame.to_excel(f'{symbol}_history.xlsx')
 ```
+
+`get_day_end_range_df(start_date, end_date=None, market='DSE', symbols=None,
+chunk='year', progress=True, use_cache=True)`:
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `start_date` | required | inclusive lower bound |
+| `end_date` | today | inclusive upper bound |
+| `market` | `'DSE'` | `'DSE'` loops the day-end archive once per calendar day (slower, skips non-trading days); `'CSE'` downloads calendar chunks |
+| `symbols` | all | iterable of trading codes to keep (case-insensitive) |
+| `chunk` | `'year'` | `'year'` or `'month'` download granularity for CSE. Monthly means more but smaller requests: better retries, cheaper short recent ranges |
+| `progress` | `True` | `True` prints one line per download, `False` is silent, or a callable `progress(chunk_start, chunk_end, index, total)` |
+| `use_cache` | `True` | `False` bypasses (and does not populate) the CSE memory/disk caches, e.g. after the exchange restated a day |
+
+`save_day_end_range_data(file_path, file_name, market, start_date, end_date, **kwargs)`
+writes the same frame to one Excel file.
 
 These mirror the DataFrame-returning methods on `FundamentalData`,
 `BlockTradeData` and `IndexData`. `save_history_data` / `save_current_data`
 are thin wrappers over them, so file output is unchanged.
 
-> Note: the DSE *live* current-price feed does not publish an open price, so
-> `get_current_price_df(market='DSE')` has no `OPENP` column. For DSE open
+> Note: the *live* current-price feeds do not publish an open price, so
+> `get_current_price_df` has no `OPENP` column for either market. For open
 > prices use `get_price_history_df` (one symbol, date range) or
-> `get_day_end_df` (all symbols, one day) — both read the day-end archive,
-> which includes `OPENP`. The CSE current feed does include an `OPEN` column.
+> `get_day_end_df` (all symbols, one day) — both read the day-end sources,
+> which include `OPENP`.
 >
-> The day-end archive is only populated **after the session closes**, so
+> The day-end sources are only populated **after the session closes**, so
 > `get_day_end_df(date=today)` called mid-session (or on a non-trading day)
 > returns an **empty DataFrame**. Use `get_current_price_df` for live intraday
 > prices.
+>
+> For CSE, `DATE` and `CLOSEP` in the current snapshot are taken from the
+> exchange's same-day day-end download (CSE publishes a closing price distinct
+> from the last trade). When that download has no rows yet, `CLOSEP` falls
+> back to `LTP` and `DATE` to the last trade date shown on the exchange site.
+> `% CHANGE` is the absolute change `LTP - YCP`, which is what DSE publishes
+> under that name.
 
 
 #### Downloading current market price data of all listed companies in DSE/CSE-
@@ -179,7 +227,7 @@ variants that return a `pandas` DataFrame instead of writing a file.
 > **DSE only.** Block trade data is available for DSE only (`market='DSE'`);
 > CSE is not supported.
 
-#### Downloading market index data from DSE (DSEX, DSES, DS30, DGEN, CDSET)-
+#### Downloading market index data (DSE: DSEX, DSES, DS30, DGEN, CDSET; CSE: CASPI, CSE30, CSCX, CSE50, CSI)-
 
 ```python
 from stocksurferbd import IndexData
@@ -202,28 +250,34 @@ loader.save_current_indices(file_name='current_indices.xlsx', market='DSE')
 
 # Current-day per-minute ticks for a single index (incl. CDSET)
 loader.save_intraday(index='CDSET', file_name='CDSET_intraday.xlsx', market='DSE')
+
+# CSE: same methods, same frame shapes
+loader.save_current_indices(file_name='cse_indices.xlsx', market='CSE')
+loader.save_index_history(file_name='cse_index_2025.xlsx', market='CSE',
+                          start_date='2025-01-01', end_date='2025-12-31')
 ```
 
 These scrape the *aggregate index* values (not per-company share tables). DSE
 serves the indices in a few different ways, so there are dedicated methods:
 
-| Method | Indices covered | Coverage |
-|--------|-----------------|----------|
-| `save_index_history` / `get_index_history_df` | `DSEX`, `DSES`, `DS30`, `DGEN` | rolling ~30 days by default; **full archive (~2010+) when `start_date`/`end_date` are given** |
-| `save_index_graph` / `get_index_graph_df` | `CDSET`, `DS30` | daily close over the last `months` (CDSET back to ~2016) |
-| `save_current_indices` / `get_current_indices_df` | `DSEX`, `DSES`, `DS30`, `CDSET` | live snapshot |
-| `save_intraday` / `get_intraday_df` | any one of the above (incl. `CDSET`) | current day, ~1-min ticks |
+| Method | DSE indices | CSE indices | Coverage |
+|--------|-------------|-------------|----------|
+| `save_index_history` / `get_index_history_df` | `DSEX`, `DSES`, `DS30`, `DGEN` | `CASPI`, `CSE30`, `CSCX`, `CSE50`, `CSI` | rolling ~30 days by default; **archive when `start_date`/`end_date` are given** (DSE ~2010+, CSE late 2015+) |
+| `save_index_graph` / `get_index_graph_df` | `CDSET`, `DS30` | not available | daily close over the last `months` (CDSET back to ~2016) |
+| `save_current_indices` / `get_current_indices_df` | `DSEX`, `DSES`, `DS30`, `CDSET` | `CASPI`, `CSE30`, `CSCX`, `CSE50`, `CSI` | live snapshot |
+| `save_intraday` / `get_intraday_df` | any one of the above (incl. `CDSET`) | not available | current day, ~1-min ticks |
 
 `start_date` / `end_date` accept a `date`/`datetime` or any parseable string
 (e.g. `'2024-01-01'`). Passing only one bounds that side; the other defaults to
 `~2010` (start) or today (end). For `save_index_graph`, `months` is a count
 (e.g. `120` for ~10 years).
 
-> **DSE only; index availability varies by launch date.** `DGEN` is legacy
+> **Index availability varies by launch date.** `DGEN` is legacy
 > (pre-2013, blank in recent rows); `DSEX`/`DS30` start Jan 2013 and `DSES`
 > starts Jan 2014 in the day-wise archive. `CDSET` is absent from that archive —
-> use `save_index_graph(index='CDSET', ...)` for its daily history. CSE indices
-> are not supported.
+> use `save_index_graph(index='CDSET', ...)` for its daily history. CSE has no
+> intraday or per-index graph source, so `save_intraday` / `save_index_graph`
+> raise for `market='CSE'`.
 
 #### Create Candlestick charts for analyzing price history-
 
@@ -269,17 +323,18 @@ The following are some example images of Candlestick plots-
 Each method writes an `.xlsx` file (and the `get_*_df` variants return the same
 data as a `pandas` DataFrame). The columns of each output are listed below.
 
-#### Price history — `PriceData.save_history_data`
-| Market | Columns |
-|--------|---------|
-| DSE | `DATE`, `TRADING_CODE`, `LTP`, `HIGH`, `LOW`, `OPENP`, `CLOSEP`, `YCP`, `TRADE`, `VALUE_MN`, `VOLUME` |
-| CSE | `DATE`, `TRADING_CODE`, `LTP`, `OPENP`, `HIGH`, `LOW`, `CLOSEP`, `YCP`, `% CHANGE`, `TRADE`, `VALUE_MN`, `VOLUME` |
+The schemas below are identical for `market='DSE'` and `market='CSE'`.
 
-#### Current prices — `PriceData.save_current_data`
-| Market | Columns |
-|--------|---------|
-| DSE | `DATE`, `TRADING_CODE`, `LTP`, `HIGH`, `LOW`, `CLOSEP`, `YCP`, `% CHANGE`, `TRADE`, `VALUE_MN`, `VOLUME` |
-| CSE | `DATE`, `TRADING_CODE`, `LTP`, `OPEN`, `HIGH`, `LOW`, `YCP`, `TRADE`, `VALUE_MN`, `VOLUME` |
+#### Price history — `PriceData.save_history_data` / `get_price_history_df`, day-end — `get_day_end_df` / `get_day_end_range_df`
+`DATE`, `TRADING_CODE`, `LTP`, `HIGH`, `LOW`, `OPENP`, `CLOSEP`, `YCP`, `TRADE`, `VALUE_MN`, `VOLUME`
+
+`DATE` is a `YYYY-MM-DD` string, `TRADING_CODE` a string, every other column a
+float; rows are newest first. `VALUE_MN` is in millions of Taka.
+
+#### Current prices — `PriceData.save_current_data` / `get_current_price_df`
+`DATE`, `TRADING_CODE`, `LTP`, `HIGH`, `LOW`, `CLOSEP`, `YCP`, `% CHANGE`, `TRADE`, `VALUE_MN`, `VOLUME`
+
+`DATE` is a `datetime.date`; `% CHANGE` is the absolute change `LTP - YCP`.
 
 > Note: the price files are written with the DataFrame index, so they also
 > contain a leading unnamed index column.
@@ -322,9 +377,9 @@ One row per block transaction for the latest trading day:
 #### Market indices — `IndexData`
 | Method | Columns |
 |--------|---------|
-| `save_index_history` | `DATE`, `TOTAL_TRADE`, `TOTAL_VOLUME`, `VALUE_MN`, `MARKET_CAP_MN`, `DSEX`, `DSES`, `DS30`, `DGEN` |
+| `save_index_history` | `DATE`, `TOTAL_TRADE`, `TOTAL_VOLUME`, `VALUE_MN`, `MARKET_CAP_MN`, then one column per index: `DSEX`, `DSES`, `DS30`, `DGEN` (DSE) or `CASPI`, `CSE30`, `CSCX`, `CSE50`, `CSI` (CSE) |
 | `save_index_graph` | `INDEX`, `DATE`, `POINTS` |
-| `save_current_indices` | `INDEX`, `POINTS`, `CHANGE`, `PCT_CHANGE` (one row per index; `CHANGE`/`PCT_CHANGE` are blank for `CDSET`) |
+| `save_current_indices` | `INDEX`, `POINTS`, `CHANGE`, `PCT_CHANGE` (one row per index; `CHANGE`/`PCT_CHANGE` are blank for `CDSET`; both markets) |
 | `save_intraday` | `INDEX`, `DATETIME`, `POINTS` |
 
 #### Block-trade news proxy — `BlockTradeData.save_block_trade_news_data` → `<symbol>_block_trade_news.xlsx` *(new in 1.0.0)*

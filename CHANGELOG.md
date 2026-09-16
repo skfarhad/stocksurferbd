@@ -4,6 +4,51 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-09-16
+
+### Added
+- **CSE output now matches the DSE schema exactly** (columns, order, dtypes,
+  newest-first ordering) for `get_price_history_df`, `get_current_price_df`
+  and `get_day_end_df`, so DSE-based code works for `market='CSE'` unchanged.
+- **CSE price history is re-sourced** from the exchange's day-end download.
+  `OPENP`, `LTP`, `YCP`, `TRADE` and `VALUE_MN` now carry real values (the
+  old chart source put the *previous close* in `OPENP` and zeros in the rest)
+  and the archive reaches back to **2015-11-24** instead of ~6 months. With no
+  dates the full archive is returned.
+- `get_day_end_df(date, market='CSE')` for all CSE symbols on one day.
+- **`get_day_end_range_df` / `save_day_end_range_data`** (both markets): all
+  symbols over a date range, with `symbols`, `chunk` (`'year'`/`'month'`),
+  `progress` (bool or callback) and `use_cache` options. This is the efficient
+  way to pull many CSE symbols.
+- `PriceData(cache_dir=...)`: optional on-disk cache of closed CSE download
+  chunks; chunks are also cached per instance, so a loop over symbols downloads
+  each period once.
+- **`IndexData` supports CSE**: `get_current_indices_df` / `get_index_history_df`
+  for CASPI, CSE30, CSCX, CSE50 and CSI with the DSE frame shapes.
+- `HttpScraper.post_with_csrf` / `get_csrf_token` and `read_xlsx_bytes`
+  helpers; `StockSurferError`, `FetchError`, `ParseError` exceptions
+  (exported from the package).
+- Offline CSE fixtures and tests (`tests/fixtures/cse_*`).
+
+### Changed
+- CSE `get_current_price_df` takes `DATE` and `CLOSEP` from the exchange's
+  same-day day-end download instead of the machine clock / a missing column;
+  `% CHANGE` is computed as the absolute change `LTP - YCP`, which is what the
+  DSE live feed publishes under that name.
+- Market arguments are validated against `VALID_MARKETS` (case-insensitive) on
+  every market-taking method.
+- `fetch_csebd_data.py` pulls the CSE archive once with
+  `get_day_end_range_df` and splits it per symbol.
+
+### Removed (breaking for CSE-only callers)
+- The CSE `OPEN` column in current prices and the `% CHANGE` column in CSE
+  history; both markets now share the DSE columns.
+- `PriceData.parse_price_history_cse`, `PriceData._filter_by_date` and
+  `HISTORY_URL_CSE` (the 6-month chart scraper).
+
+### Notes
+- DSE output is unchanged.
+
 ## [1.2.0] - 2026-06-23
 
 ### Added

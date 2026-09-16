@@ -1,7 +1,7 @@
 # Task Breakdown: CSE/DSE Uniform Data
 
 **Spec**: `2026-09-16-cse-dse-uniform-data`
-**Status**: Ready for Implementation
+**Status**: Implemented (2026-09-16) — pending `/run-tests` and manual smoke during a CSE session
 
 DSE output is canonical and must not change. Every task below makes CSE
 conform to it. Tests run offline against fixtures under `tests/fixtures/`;
@@ -144,21 +144,21 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 #### Subtasks:
 
 **4.1 Constants and guards**
-- [ ] `VALID_MARKETS = ('DSE', 'CSE')`, `CSE_INDICES = ('CASPI', 'CSE30', 'CSCX', 'CSE50', 'CSI')`, `HOME_URL_CSE`, `INDEX_SUMMARY_URL_CSE`, `HISTORICAL_DATA_PAGE_CSE`, `DOWNLOAD_INDEX_URL_CSE`, `INDEX_CURRENT_COLUMNS`.
-- [ ] `get_intraday_df` / `get_index_graph_df`: raise `IOError("Only 'DSE' is supported for ...")` for CSE with a message naming the alternative.
+- [x] `VALID_MARKETS = ('DSE', 'CSE')`, `CSE_INDICES = ('CASPI', 'CSE30', 'CSCX', 'CSE50', 'CSI')`, `HOME_URL_CSE`, `INDEX_SUMMARY_URL_CSE`, `HISTORICAL_DATA_PAGE_CSE`, `DOWNLOAD_INDEX_URL_CSE`, `INDEX_CURRENT_COLUMNS`.
+- [x] `get_intraday_df` / `get_index_graph_df`: raise `IOError("Only 'DSE' is supported for ...")` for CSE with a message naming the alternative.
 
 **4.2 Current indices**
-- [ ] `parse_index_summary_cse(index, json_text) -> dict[INDEX_CURRENT_COLUMNS]`; `None` for null values (same `_num` semantics).
-- [ ] `get_current_indices_df(market='CSE')`: one `post_with_csrf(HOME_URL_CSE, INDEX_SUMMARY_URL_CSE, {'selected_index': idx})` per index (token fetched once, reuse via a private `_post_with_token` variant or accept 5 page GETs; prefer fetching the token once).
+- [x] `parse_index_summary_cse(index, json_text) -> dict[INDEX_CURRENT_COLUMNS]`; `None` for null values (same `_num` semantics).
+- [x] `get_current_indices_df(market='CSE')`: one `post_with_csrf(HOME_URL_CSE, INDEX_SUMMARY_URL_CSE, {'selected_index': idx})` per index (token fetched once, reuse via a private `_post_with_token` variant or accept 5 page GETs; prefer fetching the token once).
 
 **4.3 Index history**
-- [ ] `parse_index_history_cse(df_xlsx) -> list[dict]` with `DATE` (`datetime.date`), `TOTAL_TRADE` (int), `TOTAL_VOLUME` (int), `VALUE_MN`, `MARKET_CAP_MN` (both `/1e6`), then `CASPI, CSE30, CSCX, CSE50, CSI`; newest first.
-- [ ] `get_index_history_df(market='CSE', start_date, end_date)`: default `end = today`, `start = today - 30 days` (DSE default is a rolling ~30 days).
+- [x] `parse_index_history_cse(df_xlsx) -> list[dict]` with `DATE` (`datetime.date`), `TOTAL_TRADE` (int), `TOTAL_VOLUME` (int), `VALUE_MN`, `MARKET_CAP_MN` (both `/1e6`), then `CASPI, CSE30, CSCX, CSE50, CSI`; newest first.
+- [x] `get_index_history_df(market='CSE', start_date, end_date)`: default `end = today`, `start = today - 30 days` (DSE default is a rolling ~30 days).
 
 **4.4 Tests**
-- [ ] `test_cse_current_indices` (5 rows, 4 columns, values from JSON fixtures).
-- [ ] `test_cse_index_history` (columns, dtypes, newest first).
-- [ ] `test_index_invalid_market` and CSE-unsupported methods raise.
+- [x] `test_cse_current_indices` (5 rows, 4 columns, values from JSON fixtures).
+- [x] `test_cse_index_history` (columns, dtypes, newest first).
+- [x] `test_index_invalid_market` and CSE-unsupported methods raise.
 
 **Acceptance Criteria**:
 - AC-6 from the spec; DSE `IndexData` tests unchanged.
@@ -177,21 +177,21 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 #### Subtasks:
 
 **5.1 README**
-- [ ] Replace the per-market schema tables under "Output data schema" with one table per method.
-- [ ] Update the `PriceData` notes: CSE history depth (2015-11-24+, gaps before mid-2018), full-archive default vs DSE's server-side ~2-year window, year chunks + `cache_dir`, the cost table from the spec, `get_day_end_df` for CSE, CLOSEP/DATE semantics for CSE current.
-- [ ] Document `get_day_end_range_df` / `save_day_end_range_data` for both markets with the parameter table (`symbols`, `chunk`, `progress`, `use_cache`) and the recommended bulk pattern (pull once, split by `TRADING_CODE`).
-- [ ] `IndexData` section: list CSE indices, which methods support CSE, remove "DSE only" where no longer true.
-- [ ] Keep "DSE only" notes for `FundamentalData` and `BlockTradeData`.
+- [x] Replace the per-market schema tables under "Output data schema" with one table per method.
+- [x] Update the `PriceData` notes: CSE history depth (2015-11-24+, gaps before mid-2018), full-archive default vs DSE's server-side ~2-year window, year chunks + `cache_dir`, the cost table from the spec, `get_day_end_df` for CSE, CLOSEP/DATE semantics for CSE current.
+- [x] Document `get_day_end_range_df` / `save_day_end_range_data` for both markets with the parameter table (`symbols`, `chunk`, `progress`, `use_cache`) and the recommended bulk pattern (pull once, split by `TRADING_CODE`).
+- [x] `IndexData` section: list CSE indices, which methods support CSE, remove "DSE only" where no longer true.
+- [x] Keep "DSE only" notes for `FundamentalData` and `BlockTradeData`.
 
 **5.2 Version and changelog**
-- [ ] `setup.py` and `pyproject.toml` -> `1.3.0`.
-- [ ] `CHANGELOG.md` `[1.3.0]` entry (Added / Changed / Breaking for CSE-only callers).
+- [x] `setup.py` and `pyproject.toml` -> `1.3.0`.
+- [x] `CHANGELOG.md` `[1.3.0]` entry (Added / Changed / Breaking for CSE-only callers).
 
 **5.3 Example script**
-- [ ] `fetch_csebd_data.py`: `pd.read_excel`, `HISTORY_FOLDER = 'cse_history_data'`, `PriceData(cache_dir='cse_cache')`; fetch with one `get_day_end_range_df(CSE_EARLIEST_DATE, today, market='CSE', progress=True)` and write one `<SYM>_history_data.xlsx` per `TRADING_CODE` group instead of a per-symbol request loop.
+- [x] `fetch_csebd_data.py`: `pd.read_excel`, `HISTORY_FOLDER = 'cse_history_data'`, `PriceData(cache_dir='cse_cache')`; fetch with one `get_day_end_range_df(CSE_EARLIEST_DATE, today, market='CSE', progress=True)` and write one `<SYM>_history_data.xlsx` per `TRADING_CODE` group instead of a per-symbol request loop.
 
 **5.4 Roadmap**
-- [ ] Mark CSE price/index parity as shipped; keep CSE fundamentals open.
+- [x] Mark CSE price/index parity as shipped; keep CSE fundamentals open.
 
 **Acceptance Criteria**:
 - AC-11; `python -c "import stocksurferbd"` works; `pytest tests/` green.
@@ -235,3 +235,21 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 **Internal Dependencies:**
 - `HttpScraper.post_with_csrf` and `read_xlsx_bytes` (group 1) before groups 2–4.
 - `_cse_day_end_frame` (group 2) before group 3.
+
+---
+
+## Session Notes (2026-09-16)
+
+- All five task groups implemented; suite: 82 passed (38 pre-existing DSE tests untouched).
+- Live smoke (after the CSE session): `get_day_end_range_df` Sep-2026 for ACI,
+  `get_day_end_df('2026-09-15', 'CSE')` = 377 rows, `get_current_price_df('CSE')`
+  = 387 rows with columns and dtypes identical to DSE; 48 rows carried a
+  `CLOSEP` distinct from `LTP`; `DATE` came from the exchange download.
+- Spec correction found during execution: DSE's `% CHANGE` column holds the
+  absolute change `LTP - YCP` (97% of live rows), not a percentage; CSE now
+  computes the same quantity.
+- Cache files are named `cse_day_end_<from>_<to>.pkl` (not per year) so month
+  and year chunks coexist.
+- Still unverified: whether the CSE company download is populated **intraday**
+  (all checks ran after 14:30 BD). The join-with-fallback design handles both
+  cases; confirm during a session before wording the README more strongly.
