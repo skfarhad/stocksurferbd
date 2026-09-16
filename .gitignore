@@ -33,3 +33,6 @@ company_info/
 */build/
 */dist/
 *_linux64/
+
+# Test fixtures are committed even though data files are ignored
+!tests/fixtures/*.xlsx

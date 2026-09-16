@@ -21,29 +21,29 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 #### Subtasks:
 
 **1.1 Exception hierarchy**
-- [ ] Add `StockSurferError`, `FetchError(StockSurferError)`, `ParseError(StockSurferError)` to `utils.py`; export from `__init__.py`.
-- [ ] Do not change existing raises elsewhere (out of scope).
+- [x] Add `StockSurferError`, `FetchError(StockSurferError)`, `ParseError(StockSurferError)` to `utils.py`; export from `__init__.py`.
+- [x] Do not change existing raises elsewhere (out of scope).
 
 **1.2 CSRF-aware POST**
-- [ ] Add `CSRF_FIELD_CSE = 'csrf_cse_token'` and `post_with_csrf(self, page_url, action_url, data)` to `HttpScraper`.
-- [ ] GET `page_url` via `self.session`, regex the hidden input value, POST `data + token` to `action_url` with `Referer=page_url`; honour `verify`/`timeout`.
-- [ ] Raise `ParseError` when no token; wrap `requests.RequestException` in `FetchError`.
-- [ ] Add `read_xlsx_bytes(content, content_type)` helper: `ParseError` if content type is not a spreadsheet, else `pd.read_excel(BytesIO, engine='openpyxl')`.
+- [x] Add `CSRF_FIELD_CSE = 'csrf_cse_token'` and `post_with_csrf(self, page_url, action_url, data)` to `HttpScraper`.
+- [x] GET `page_url` via `self.session`, regex the hidden input value, POST `data + token` to `action_url` with `Referer=page_url`; honour `verify`/`timeout`.
+- [x] Raise `ParseError` when no token; wrap `requests.RequestException` in `FetchError`.
+- [x] Add `read_xlsx_bytes(content, content_type)` helper: `ParseError` if content type is not a spreadsheet, else `pd.read_excel(BytesIO, engine='openpyxl')`.
 
 **1.3 Fixtures (trimmed, committed)**
-- [ ] `cse_day_end_2026-09-15.xlsx`: company download for `2026-09-15..2026-09-15` (all symbols, one day).
-- [ ] `cse_day_end_range.xlsx`: company download `2026-09-10..2026-09-15` trimmed to 3 symbols (ACI, BRACBANK, 1JANATAMF) so the multi-day/symbol-filter tests stay small.
-- [ ] `cse_current_prices.html`: live `#dataTable` page trimmed to the header row plus ~10 symbol rows (must include the 3 above and one with `YCP == 0`).
-- [ ] `cse_company_details_aci.html`: company page trimmed to the "Current Market Information" block (contains the "Last Trade Date"/"Updated Date" label).
-- [ ] `cse_index_summary_<IDX>.json` x5: responses of `load__index_summary/`.
-- [ ] `cse_index_history.xlsx`: index download `2026-09-10..2026-09-15`.
-- [ ] `cse_historicaldata_page.html`: trimmed page containing only the CSRF hidden input (for `post_with_csrf` tests).
-- [ ] Add loader fixtures in `conftest.py` (`cse_day_end_bytes`, `cse_current_soup`, `cse_company_html`, `cse_index_json`, `cse_index_history_bytes`).
+- [x] `cse_day_end_2026-09-15.xlsx`: company download for `2026-09-15..2026-09-15` (all symbols, one day).
+- [x] `cse_day_end_range.xlsx`: company download `2026-09-10..2026-09-15` trimmed to 3 symbols (ACI, BRACBANK, 1JANATAMF) so the multi-day/symbol-filter tests stay small.
+- [x] `cse_current_prices.html`: live `#dataTable` page trimmed to the header row plus ~10 symbol rows (must include the 3 above and one with `YCP == 0`).
+- [x] `cse_company_details_aci.html`: company page trimmed to the "Current Market Information" block (contains the "Last Trade Date"/"Updated Date" label).
+- [x] `cse_index_summary_<IDX>.json` x5: responses of `load__index_summary/`.
+- [x] `cse_index_history.xlsx`: index download `2026-09-10..2026-09-15`.
+- [x] `cse_historicaldata_page.html`: trimmed page containing only the CSRF hidden input (for `post_with_csrf` tests).
+- [x] Add loader fixtures in `conftest.py` (`cse_day_end_bytes`, `cse_current_soup`, `cse_company_html`, `cse_index_json`, `cse_index_history_bytes`).
 
 **1.4 Tests**
-- [ ] `test_post_with_csrf_sends_token_and_referer` (mock `session.get`/`session.post`).
-- [ ] `test_post_with_csrf_missing_token_raises`.
-- [ ] `test_read_xlsx_bytes_rejects_html`.
+- [x] `test_post_with_csrf_sends_token_and_referer` (mock `session.get`/`session.post`).
+- [x] `test_post_with_csrf_missing_token_raises`.
+- [x] `test_read_xlsx_bytes_rejects_html`.
 
 **Acceptance Criteria**:
 - `post_with_csrf` sends the token extracted from the page, reuses the session, and sets Referer.
