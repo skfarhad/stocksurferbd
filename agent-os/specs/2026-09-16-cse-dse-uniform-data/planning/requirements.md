@@ -50,17 +50,21 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
    CSE `% CHANGE` column.
 2. **Canonical current-price schema (DSE):**
    `DATE, TRADING_CODE, LTP, HIGH, LOW, CLOSEP, YCP, % CHANGE, TRADE, VALUE_MN, VOLUME`.
-   CSE current must return these columns in this order. `CLOSEP` for CSE live
-   rows follows the DSE live-feed semantics (DSE publishes it as the running
-   close; for CSE use LTP when the session is open). `% CHANGE` is computed as
+   CSE current must return these columns in this order. CSE publishes a real
+   close price distinct from LTP (differed in 48/377 rows on 2026-09-16) in
+   its day-end download and on each company page; `CLOSEP` is taken from the
+   same-day download joined on code, falling back to `LTP` when the download
+   has no rows for today yet. `% CHANGE` is computed as
    `(LTP - YCP) / YCP * 100` rounded to 2 dp, matching DSE's published value.
    The CSE `OPEN` column is dropped from the default output (DSE has none).
 3. **Day-end for CSE:** `get_day_end_df(date, market='CSE')` returns the
    history schema for all symbols on that date, sourced from
    `data_download_company` with `from == to == date`.
 4. **Real history depth:** CSE `start_date`/`end_date` are sent to the download
-   endpoint natively; with no dates, default to the same window the current
-   6-month behaviour gives (approx. 6 months) so callers see no regression.
+   endpoint natively. With no dates, default to the **same window DSE returns
+   with no dates**: the DSE archive serves ~2 years (verified 2026-09-16: 479
+   rows, 2024-09-17..2026-09-16), so CSE defaults to `today - 2 years`.
+   CSE data exists from 2015-11-24 with gaps before mid-2018.
 5. **Value units:** CSE `turnover` is in Taka; convert to millions for
    `VALUE_MN` (2 dp). `TRADE` and `VOLUME` remain floats as in DSE rows.
 6. **Trading date for CSE current prices:** derive from the exchange, not the
@@ -92,10 +96,11 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
   rows and parses in well under a second with pandas/openpyxl.
 - Security: no credentials; CSRF token is public page state. `verify`,
   `session`, `timeout` options must keep working.
+- Performance (history): a 1-year all-symbol CSE download is ~95k rows / 4.3 MB / ~21 s. Chunk by calendar year and cache parsed chunks per `PriceData` instance so a loop over symbols downloads each year once.
 - Compatibility: DSE outputs unchanged (regression tests on existing fixtures).
   Existing CSE callers get the same column names as DSE; this is a deliberate
   breaking change for CSE-only callers and is called out in the changelog with
-  a version bump (1.2.0).
+  a version bump (1.3.0; 1.2.0 is already tagged).
 - Dependencies: add `openpyxl` (already the pandas Excel engine used by
   `to_excel`) to install requirements explicitly.
 
