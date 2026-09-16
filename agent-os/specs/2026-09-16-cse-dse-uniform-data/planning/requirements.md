@@ -61,20 +61,29 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
    history schema for all symbols on that date, sourced from
    `data_download_company` with `from == to == date`.
 4. **Real history depth:** CSE `start_date`/`end_date` are sent to the download
-   endpoint natively. With no dates, default to the **same window DSE returns
-   with no dates**: the DSE archive serves ~2 years (verified 2026-09-16: 479
-   rows, 2024-09-17..2026-09-16), so CSE defaults to `today - 2 years`.
-   CSE data exists from 2015-11-24 with gaps before mid-2018.
-5. **Value units:** CSE `turnover` is in Taka; convert to millions for
+   endpoint natively. With no dates, CSE returns **everything available**:
+   `start = 2015-11-24` (earliest date the CSE download serves; gaps before
+   mid-2018), `end = today`. This intentionally differs from DSE, whose
+   ~2-year no-date window is a limit of the DSE server, not of this library.
+5. **Bulk fetch for CSE-shaped sources:** add
+   `get_day_end_range_df(start_date, end_date, market)` returning the history
+   schema for **all symbols over a date range**. For CSE this is the native
+   download (one request per year chunk); for DSE it loops `get_day_end_df`
+   per trading day so the method exists for both markets with the same output.
+6. **Chunking and caching (CSE engine, not public API):** year chunks,
+   sequential downloads with a progress message, in-memory cache per instance,
+   optional on-disk cache of closed years via a `cache_dir` constructor
+   argument (off by default). A chunk that includes today is never cached.
+7. **Value units:** CSE `turnover` is in Taka; convert to millions for
    `VALUE_MN` (2 dp). `TRADE` and `VOLUME` remain floats as in DSE rows.
-6. **Trading date for CSE current prices:** derive from the exchange, not the
+8. **Trading date for CSE current prices:** derive from the exchange, not the
    machine clock (the company-details page or the latest day-end date), so a
    weekend/holiday call gets the last trading date like DSE does.
-7. **`DATE` type parity:** whatever type DSE emits per method today, CSE emits
+9. **`DATE` type parity:** whatever type DSE emits per method today, CSE emits
    the same (history: `YYYY-MM-DD` string; current: `datetime.date`).
-8. **CSRF-aware POST helper** in `HttpScraper`: fetch page, extract
+10. **CSRF-aware POST helper** in `HttpScraper`: fetch page, extract
    `csrf_cse_token`, POST with session cookie and Referer.
-9. **IndexData for CSE:**
+11. **IndexData for CSE:**
    - `get_current_indices_df(market='CSE')` -> `INDEX, POINTS, CHANGE, PCT_CHANGE`
      for CASPI, CSE30, CSCX, CSE50, CSI via the JSON endpoint.
    - `get_index_history_df(market='CSE', start_date, end_date)` ->
@@ -84,11 +93,11 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
      market-specific, mirroring how DSE emits `DSEX, DSES, DS30, DGEN`.
    - `get_intraday_df` / `get_index_graph_df` keep raising a clear error for
      CSE (no source found).
-10. **Excel/CSV writers unchanged.** `save_*` wrappers keep writing the same
+12. **Excel/CSV writers unchanged.** `save_*` wrappers keep writing the same
     files; only the DataFrame content changes for CSE.
-11. **README** documents a single schema per method rather than one per market,
+13. **README** documents a single schema per method rather than one per market,
     and lists CSE index names and the CSE history depth.
-12. **Fix `fetch_csebd_data.py`** to read the xlsx it writes.
+14. **Fix `fetch_csebd_data.py`** to read the xlsx it writes.
 
 ## Non-Functional Requirements
 - Performance: one HTTP round-trip (plus one token fetch per session) per
@@ -96,7 +105,7 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
   rows and parses in well under a second with pandas/openpyxl.
 - Security: no credentials; CSRF token is public page state. `verify`,
   `session`, `timeout` options must keep working.
-- Performance (history): a 1-year all-symbol CSE download is ~95k rows / 4.3 MB / ~21 s. Chunk by calendar year and cache parsed chunks per `PriceData` instance so a loop over symbols downloads each year once.
+- Performance (history): a 1-year all-symbol CSE download is ~95k rows / 4.3 MB / ~21 s; the full archive (2015-11-24..today) is ~11 chunks, ~1M rows, 3-4 minutes cold. Year chunks + per-instance cache (+ optional `cache_dir`) make every further symbol on the same instance free. Bulk callers use `get_day_end_range_df` once and split by symbol.
 - Compatibility: DSE outputs unchanged (regression tests on existing fixtures).
   Existing CSE callers get the same column names as DSE; this is a deliberate
   breaking change for CSE-only callers and is called out in the changelog with
@@ -113,6 +122,13 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
       history schema.
 - [ ] `get_price_history_df('ACI', market='CSE', start_date='2021-01-03', end_date='2021-01-07')`
       returns 5 rows (data older than the 6-month chart window).
+- [ ] `get_price_history_df('ACI', market='CSE')` with no dates spans from
+      2015-11-24 (or the symbol's first traded day) to today.
+- [ ] `get_day_end_range_df('2026-09-10', '2026-09-15', market='CSE')` returns
+      all symbols for 4 trading days in the history schema; the same call for
+      DSE returns the same columns.
+- [ ] Ten `get_price_history_df` calls for different CSE symbols on one
+      instance perform each year download once (mocked session).
 - [ ] `get_current_indices_df(market='CSE')` returns 5 rows with
       `INDEX, POINTS, CHANGE, PCT_CHANGE`.
 - [ ] `get_index_history_df(market='CSE', start_date=..., end_date=...)`

@@ -64,15 +64,20 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 - [ ] `VALID_MARKETS = ('DSE', 'CSE')`; use it in every market check.
 - [ ] `HISTORY_COLUMNS` and `CURRENT_COLUMNS` (exact DSE order from the spec).
 - [ ] `HISTORICAL_DATA_PAGE_CSE`, `DOWNLOAD_COMPANY_URL_CSE`, `COMPANY_DETAILS_URL_CSE`.
-- [ ] `_CSE_HISTORY_COLUMN_MAP` (xlsx column -> canonical) and `CSE_DEFAULT_HISTORY_YEARS = 2`, `CSE_EARLIEST_DATE = '2015-11-24'`.
+- [ ] `_CSE_HISTORY_COLUMN_MAP` (xlsx column -> canonical), `CSE_EARLIEST_DATE = '2015-11-24'`, `CSE_CACHE_FILE_PATTERN = 'cse_day_end_{year}.pkl'`.
+- [ ] `PriceData.__init__(..., cache_dir=None)` passing the HTTP args through to `HttpScraper`; `self._cse_chunk_cache = {}`.
 
 **2.2 Download -> canonical frame**
 - [ ] `_cse_rows_to_history(df_xlsx) -> DataFrame[HISTORY_COLUMNS]`: rename, `DATE` to `YYYY-MM-DD` str, floats, `VALUE_MN = round(turnover / 1e6, 3)`, drop `company_name`, sort `DATE` desc then `TRADING_CODE` asc.
 - [ ] `_cse_year_chunks(start, end) -> list[(from, to)]` calendar-year chunks clipped to the range.
-- [ ] `_cse_day_end_frame(start, end)`: for each chunk, use `self._cse_chunk_cache` unless the chunk includes today; else `post_with_csrf` + `read_xlsx_bytes` + `_cse_rows_to_history`; concat; return empty frame with columns when nothing.
+- [ ] `_cse_year_chunks` clips to `CSE_EARLIEST_DATE..today`; a range entirely before the earliest date yields no chunks.
+- [ ] `_cse_day_end_frame(start, end)`: per chunk, resolve in order memory cache -> disk cache (`cache_dir`, closed years only) -> network (`post_with_csrf` + `read_xlsx_bytes` + `_cse_rows_to_history`). Store in memory and, when `cache_dir` is set and the chunk is closed (`to < today`), on disk. Print one progress line per network chunk. Concat; return empty frame with columns when nothing.
+- [ ] `_cse_chunk_is_closed(chunk)` helper so the today-rule lives in one place.
 
 **2.3 Public methods**
-- [ ] `get_price_history_df(..., market='CSE')`: default `start = today - 2 years`, `end = today`; frame filtered to `TRADING_CODE == symbol.strip().upper()`.
+- [ ] `get_price_history_df(..., market='CSE')`: default `start = CSE_EARLIEST_DATE`, `end = today` (full archive); frame filtered to `TRADING_CODE == symbol.strip().upper()`.
+- [ ] `get_day_end_range_df(start_date, end_date=None, market='DSE')`: CSE -> `_cse_day_end_frame`; DSE -> loop calendar days over `parse_day_end_dse`, skip empty days, concat; both return `HISTORY_COLUMNS`, newest first. Validate `start_date` is required.
+- [ ] `save_day_end_range_data(file_path='', file_name='day_end_range.xlsx', market='DSE', start_date=None, end_date=None)` thin wrapper.
 - [ ] `get_day_end_df(date, market='CSE')`: `_cse_day_end_frame(day, day)`; keep DSE branch unchanged.
 - [ ] Remove `HISTORY_URL_CSE`, `parse_price_history_cse`, `_filter_by_date` and their tests (`test_filter_by_date_*`).
 - [ ] Ensure DSE branches are byte-for-byte unchanged (run existing tests).
@@ -81,12 +86,16 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 - [ ] `test_cse_history_matches_dse_schema` (columns, dtypes, newest first).
 - [ ] `test_cse_history_field_mapping` (OPENP, YCP, VALUE_MN, LTP for a known row in the fixture).
 - [ ] `test_cse_history_symbol_filter_and_range`.
-- [ ] `test_cse_history_chunks_cached` (mock `post_with_csrf`, two symbols, assert call count == number of year chunks).
+- [ ] `test_cse_history_chunks_cached` (mock `post_with_csrf`, two symbols, assert call count == number of year chunks; the chunk containing today is fetched again on the second call).
+- [ ] `test_cse_history_default_is_full_archive` (no dates -> first chunk starts 2015-11-24, last ends today).
+- [ ] `test_cse_year_chunks_clipping` (range before 2015 -> no chunks; range straddling years -> correct boundaries).
+- [ ] `test_cse_disk_cache_roundtrip` (`tmp_path` as `cache_dir`: closed year written, current year not; second instance loads from disk with zero POSTs).
+- [ ] `test_day_end_range_cse` and `test_day_end_range_dse` (DSE mocked `_get` returning a table for 2 of 4 days; columns identical to `HISTORY_COLUMNS`).
 - [ ] `test_cse_day_end_all_symbols`, `test_cse_day_end_empty_range`.
 - [ ] `test_invalid_market_raises` covers history, current, day-end.
 
 **Acceptance Criteria**:
-- AC-1, AC-2, AC-4, AC-5, AC-7, AC-8 from the spec.
+- AC-1, AC-2, AC-4, AC-5, AC-5b, AC-5c, AC-7, AC-8 from the spec.
 
 ---
 
@@ -164,7 +173,8 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 
 **5.1 README**
 - [ ] Replace the per-market schema tables under "Output data schema" with one table per method.
-- [ ] Update the `PriceData` notes: CSE history depth (2015-11-24+, gaps before mid-2018), 2-year default, chunk cache, `get_day_end_df` for CSE, CLOSEP/DATE semantics for CSE current.
+- [ ] Update the `PriceData` notes: CSE history depth (2015-11-24+, gaps before mid-2018), full-archive default vs DSE's server-side ~2-year window, year chunks + `cache_dir`, the cost table from the spec, `get_day_end_df` for CSE, CLOSEP/DATE semantics for CSE current.
+- [ ] Document `get_day_end_range_df` / `save_day_end_range_data` for both markets with the recommended bulk pattern (pull once, split by `TRADING_CODE`).
 - [ ] `IndexData` section: list CSE indices, which methods support CSE, remove "DSE only" where no longer true.
 - [ ] Keep "DSE only" notes for `FundamentalData` and `BlockTradeData`.
 
@@ -173,7 +183,7 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 - [ ] `CHANGELOG.md` `[1.3.0]` entry (Added / Changed / Breaking for CSE-only callers).
 
 **5.3 Example script**
-- [ ] `fetch_csebd_data.py`: `pd.read_excel`, use `HISTORY_FOLDER = 'cse_history_data'`, reuse the single `PriceData` instance so the year cache is hit.
+- [ ] `fetch_csebd_data.py`: `pd.read_excel`, `HISTORY_FOLDER = 'cse_history_data'`, `PriceData(cache_dir='cse_cache')`; fetch with one `get_day_end_range_df(CSE_EARLIEST_DATE, today, market='CSE')` and write one `<SYM>_history_data.xlsx` per `TRADING_CODE` group instead of a per-symbol request loop.
 
 **5.4 Roadmap**
 - [ ] Mark CSE price/index parity as shipped; keep CSE fundamentals open.
@@ -204,7 +214,7 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 
 ### Risk Mitigation
 - **DSE regression**: never edit DSE branches; run the full suite after each group.
-- **Large downloads**: chunk by year, cache per instance, never cache a chunk that includes today.
+- **Large downloads**: the CSE source is all-symbols-per-range; there is no per-symbol OHLCV endpoint. Make stock-wise *calls* cheap instead: year chunks, memory cache per instance, optional `cache_dir` for closed years, never cache a chunk that includes today, sequential requests with progress output. Steer batch users to `get_day_end_range_df`.
 - **Intraday availability of the company download is unverified** (session 10:00–14:30 BD). The join-with-fallback design works either way; confirm during execution and word the README accordingly.
 - **CSE layout drift**: the xlsx column names are the contract; assert on them and raise `ParseError` naming missing columns.
 - **CSRF**: token is per page load; always fetch it in the same session that posts.

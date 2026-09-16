@@ -64,15 +64,26 @@ session cookie and a `Referer`.
 
 ### Architecture Overview
 ```
-PriceData.get_price_history_df(sym, market='CSE', start, end)
-  └─ _cse_day_end_frame(start, end)                # all symbols, canonical columns
-       ├─ for each calendar-year chunk in [start, end]:
-       │     self._cse_chunk_cache.get(chunk) or
-       │     HttpScraper.post_with_csrf(HISTORICAL_DATA_PAGE_CSE, DOWNLOAD_COMPANY_URL_CSE, {from,to})
-       │     -> pd.read_excel(bytes, engine='openpyxl') -> _cse_rows_to_history(df)
-       └─ filter TRADING_CODE == sym, sort DATE desc (DSE order)
+Public surface (identical frames for both markets):
+  get_price_history_df(sym, market, start, end)     per symbol            (existing)
+  get_day_end_df(date, market)                       all symbols, one day  (existing; CSE added)
+  get_day_end_range_df(start, end, market)           all symbols, range    (NEW, both markets)
+  get_current_price_df(market)                       live snapshot         (existing)
 
-PriceData.get_day_end_df(date, market='CSE')       -> _cse_day_end_frame(date, date)
+CSE engine (private):
+  _cse_day_end_frame(start, end)                    # all symbols, canonical columns
+    ├─ for each calendar-year chunk in [start, end] (clipped to CSE_EARLIEST_DATE..today):
+    │     memory cache  -> disk cache (cache_dir, closed years only) ->
+    │     post_with_csrf(HISTORICAL_DATA_PAGE_CSE, DOWNLOAD_COMPANY_URL_CSE, {from,to})
+    │     -> read_xlsx_bytes -> _cse_rows_to_history(df); store in caches unless chunk includes today
+    │     print progress: "CSE download 2019-01-01..2019-12-31 (3/11)"
+    └─ concat, sort DATE desc, TRADING_CODE asc
+
+get_price_history_df(sym, 'CSE')       -> _cse_day_end_frame(start or CSE_EARLIEST_DATE, end or today)
+                                          .query(TRADING_CODE == sym)
+get_day_end_df(date, 'CSE')            -> _cse_day_end_frame(date, date)
+get_day_end_range_df(start, end, 'CSE')-> _cse_day_end_frame(start, end)
+get_day_end_range_df(start, end, 'DSE')-> concat(get_day_end_df(d, 'DSE') for each calendar day; empty days skipped)
 PriceData.get_current_price_df(market='CSE')       -> live #dataTable rows
                                                      + CLOSEP/DATE joined from _cse_day_end_frame(today, today)
                                                      (fallback: CLOSEP = LTP, DATE from company page, then today)
@@ -134,15 +145,46 @@ Sort: `DATE` descending, then `TRADING_CODE` ascending.
 `turnover / 1e6 -> VALUE_MN`, `market_capital / 1e6 -> MARKET_CAP_MN`,
 `<idx>_value -> <IDX>` for the five indices. Newest first, like DSE.
 
-### Date handling and defaults
-- History with no dates: `end = today`, `start = today - 2 years`, matching
-  the ~2-year window the DSE archive returns with no dates.
-- Ranges are split into calendar-year chunks; each chunk is one POST. Parsed
-  chunks are cached on the instance (`self._cse_chunk_cache: dict[(from,to), DataFrame]`)
-  so a loop over all symbols downloads each year once. The current-year chunk
-  is not cached across calls (it changes intraday).
-- `_fmt_date` already normalises inputs; reuse it. `DATE` earlier than
-  2015-11-24 simply yields no rows.
+### Date handling, defaults, chunking and cache
+- **CSE history with no dates returns the full archive**: `start =
+  CSE_EARLIEST_DATE = '2015-11-24'`, `end = today`. DSE's ~2-year no-date
+  window is a DSE server limit and is deliberately not mirrored.
+- **Chunks**: calendar years, clipped to the requested range and to
+  `CSE_EARLIEST_DATE..today`. One POST per chunk (~95k rows / 4.3 MB / ~21 s
+  for a full year). Downloads are sequential with a one-line progress print
+  per chunk; no concurrency (CSE's server is slow and untested under load).
+- **Memory cache**: `self._cse_chunk_cache: dict[(from, to), DataFrame]` on
+  the `PriceData` instance. Any chunk whose `to >= today` is never cached.
+- **Disk cache (optional)**: new constructor argument `cache_dir=None` on
+  `PriceData`. When set, each *closed* year chunk is stored as
+  `<cache_dir>/cse_day_end_<YYYY>.pkl` (pandas pickle; no new dependency) and
+  loaded before any network call. Closed years are immutable on the exchange
+  side, so no expiry is needed. The current year is never written to disk.
+- **Cost table** (documented in README):
+
+  | Call | Requests | Time (approx.) |
+  |------|----------|----------------|
+  | first CSE symbol, no dates, cold | ~11 | 3-4 min |
+  | any further symbol, same instance or `cache_dir` | 0-1 (current year) | seconds |
+  | explicit short range (1 month) | 1 | ~3 s |
+  | `get_day_end_range_df` full archive, all symbols | ~11 | 3-4 min, once |
+
+- `_fmt_date` already normalises inputs; reuse it. Ranges entirely before
+  2015-11-24 yield an empty frame with the canonical columns.
+
+### `get_day_end_range_df` (new, both markets)
+```python
+def get_day_end_range_df(self, start_date, end_date=None, market='DSE'):
+    """History schema for ALL symbols over [start_date, end_date]."""
+```
+- CSE: `_cse_day_end_frame(start, end)` (the native shape of the source).
+- DSE: iterate calendar days, call `parse_day_end_dse(day)`, skip empty days
+  (weekends/holidays), concat. Documented as slower on DSE (one request per
+  trading day).
+- `save_day_end_range_data(file_path, file_name, market, start_date, end_date)`
+  thin wrapper writing one xlsx, matching the other `save_*` helpers.
+- Batch drivers (`fetch_csebd_data.py`) use it once and split by
+  `TRADING_CODE` instead of calling `save_history_data` per symbol.
 
 ### HttpScraper changes (`utils.py`)
 ```python
@@ -172,7 +214,7 @@ Also introduce the small exception hierarchy the standards call for
 | File | Change |
 |------|--------|
 | `stocksurferbd_pkg/stocksurferbd/utils.py` | exceptions, `post_with_csrf`, `read_xlsx_bytes` |
-| `stocksurferbd_pkg/stocksurferbd/price_data_scraper.py` | CSE URL constants, column constants, `_cse_day_end_frame`, chunking + cache, `parse_current_prices_cse` reshape, `get_day_end_df` CSE; remove chart-based `parse_price_history_cse`, `HISTORY_URL_CSE`, `_filter_by_date` |
+| `stocksurferbd_pkg/stocksurferbd/price_data_scraper.py` | CSE URL constants, column constants, `cache_dir` ctor arg, `_cse_day_end_frame` (year chunks, memory + disk cache, progress), `get_day_end_range_df` + `save_day_end_range_data` (both markets), `parse_current_prices_cse` reshape, `get_day_end_df` CSE; remove chart-based `parse_price_history_cse`, `HISTORY_URL_CSE`, `_filter_by_date` |
 | `stocksurferbd_pkg/stocksurferbd/index_data_scraper.py` | `CSE_INDICES`, CSE current + history, market guards |
 | `stocksurferbd_pkg/setup.py`, `stocksurferbd_pkg/pyproject.toml` | version 1.3.0 |
 | `CHANGELOG.md`, `README.md` | 1.3.0 entry; one schema table per method; CSE notes |
@@ -189,10 +231,12 @@ Also introduce the small exception hierarchy the standards call for
 - [ ] AC-2: CSE history `OPENP == open_price`, `YCP == prev_close_price`, `VALUE_MN == turnover/1e6`; no column is a constant zero.
 - [ ] AC-3: CSE and DSE `get_current_price_df` return identical column lists; CSE `DATE` is the exchange trading date; `CLOSEP` comes from the download when available.
 - [ ] AC-4: `get_day_end_df('2026-09-15', market='CSE')` returns >300 rows in the history schema.
-- [ ] AC-5: CSE history for `2021-01-03..2021-01-07` returns 5 rows; no-date call spans ~2 years.
+- [ ] AC-5: CSE history for `2021-01-03..2021-01-07` returns 5 rows; no-date call spans from 2015-11-24 (or the symbol's first trade) to today.
+- [ ] AC-5b: `get_day_end_range_df` returns the history schema for all symbols for both markets; the DSE variant skips non-trading days.
+- [ ] AC-5c: with `cache_dir` set, a second `PriceData` instance serves closed years from disk with no network call (mocked session asserts zero POSTs for those chunks).
 - [ ] AC-6: `get_current_indices_df(market='CSE')` returns 5 rows; `get_index_history_df(market='CSE', ...)` returns DSE leading columns plus `CASPI, CSE30, CSCX, CSE50, CSI`.
 - [ ] AC-7: All pre-existing DSE tests pass without modification.
-- [ ] AC-8: Looping `get_price_history_df` over 10 CSE symbols on one instance performs the year downloads once (cache hit count asserted with a mocked session).
+- [ ] AC-8: Looping `get_price_history_df` over 10 CSE symbols on one instance performs each year download once (call count asserted with a mocked session); the chunk containing today is never cached.
 
 ### Non-Functional
 - [ ] AC-9: No CSE test hits the network; all parse from `tests/fixtures/`.
@@ -211,7 +255,10 @@ Also introduce the small exception hierarchy the standards call for
 | `test_cse_history_matches_dse_schema` | columns/dtypes equal `HISTORY_COLUMNS`; newest first | `tests/test_price_data.py` |
 | `test_cse_history_field_mapping` | OPENP/YCP/VALUE_MN from xlsx fixture | `tests/test_price_data.py` |
 | `test_cse_history_symbol_filter_and_range` | one symbol, date bounds inclusive | `tests/test_price_data.py` |
-| `test_cse_history_chunks_cached` | two symbols, one download per year chunk | `tests/test_price_data.py` |
+| `test_cse_history_chunks_cached` | two symbols, one download per year chunk; today's chunk re-fetched | `tests/test_price_data.py` |
+| `test_cse_history_default_is_full_archive` | no dates -> chunks from 2015-11-24 to today | `tests/test_price_data.py` |
+| `test_cse_disk_cache_roundtrip` | `cache_dir` writes closed years, second instance reads them, current year not written | `tests/test_price_data.py` |
+| `test_day_end_range_cse` / `test_day_end_range_dse` | both markets, same columns; DSE skips empty days | `tests/test_price_data.py` |
 | `test_cse_day_end_all_symbols` | one-day fixture -> all rows | `tests/test_price_data.py` |
 | `test_cse_day_end_empty_range` | empty xlsx -> empty df with columns | `tests/test_price_data.py` |
 | `test_cse_current_matches_dse_schema` | live HTML fixture; `% CHANGE` computed; `OPEN` dropped | `tests/test_price_data.py` |
@@ -232,6 +279,7 @@ way the join-with-fallback design holds, but the README wording depends on it.
 ## Rollout
 - Version `1.2.0 -> 1.3.0` (1.2.0 is tagged).
 - Changelog: CSE outputs now match DSE schemas; CSE history re-sourced (real
-  open, LTP, YCP, trades, value; ~10 years of depth); `get_day_end_df` and
-  `IndexData` support CSE. Breaking for CSE-only callers relying on `OPEN` /
+  open, LTP, YCP, trades, value; full archive from 2015-11-24 by default);
+  new `get_day_end_range_df` / `save_day_end_range_data` for both markets;
+  optional `cache_dir`; `get_day_end_df` and `IndexData` support CSE. Breaking for CSE-only callers relying on `OPEN` /
   `% CHANGE` in history. DSE unchanged.
