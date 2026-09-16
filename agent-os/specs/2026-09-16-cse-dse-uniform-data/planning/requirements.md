@@ -68,8 +68,12 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
 5. **Bulk fetch for CSE-shaped sources:** add
    `get_day_end_range_df(start_date, end_date, market)` returning the history
    schema for **all symbols over a date range**. For CSE this is the native
-   download (one request per year chunk); for DSE it loops `get_day_end_df`
+   download (one request per chunk); for DSE it loops `get_day_end_df`
    per trading day so the method exists for both markets with the same output.
+   Configurable via `symbols=None` (filter to a subset of trading codes),
+   `chunk='year'|'month'` (download granularity, CSE only), `progress=True`
+   (bool or callable receiving `(chunk_from, chunk_to, index, total)`), and
+   `use_cache=True` (bypass memory and disk caches for one call).
 6. **Chunking and caching (CSE engine, not public API):** year chunks,
    sequential downloads with a progress message, in-memory cache per instance,
    optional on-disk cache of closed years via a `cache_dir` constructor
@@ -127,6 +131,10 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
 - [ ] `get_day_end_range_df('2026-09-10', '2026-09-15', market='CSE')` returns
       all symbols for 4 trading days in the history schema; the same call for
       DSE returns the same columns.
+- [ ] `symbols=['ACI', 'BRACBANK']` returns only those codes; `chunk='month'`
+      issues one request per month; `progress=False` prints nothing and a
+      callable receives one call per network chunk; `use_cache=False` re-downloads
+      a chunk already held in the cache.
 - [ ] Ten `get_price_history_df` calls for different CSE symbols on one
       instance perform each year download once (mocked session).
 - [ ] `get_current_indices_df(market='CSE')` returns 5 rows with

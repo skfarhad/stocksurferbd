@@ -174,15 +174,33 @@ Sort: `DATE` descending, then `TRADING_CODE` ascending.
 
 ### `get_day_end_range_df` (new, both markets)
 ```python
-def get_day_end_range_df(self, start_date, end_date=None, market='DSE'):
-    """History schema for ALL symbols over [start_date, end_date]."""
+def get_day_end_range_df(self, start_date, end_date=None, market='DSE',
+                         symbols=None, chunk='year', progress=True,
+                         use_cache=True):
+    """History schema for ALL symbols (or `symbols`) over [start_date, end_date]."""
 ```
-- CSE: `_cse_day_end_frame(start, end)` (the native shape of the source).
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `start_date` | required | inclusive lower bound (`date`/`datetime`/parseable string) |
+| `end_date` | `None` -> today | inclusive upper bound |
+| `market` | `'DSE'` | `'DSE'` or `'CSE'`; validated against `VALID_MARKETS` |
+| `symbols` | `None` -> all | iterable of trading codes; upper-cased and stripped; applied after download (the CSE source is all-symbols, so this saves memory and a caller-side filter, not bandwidth). Ignored by DSE only in the sense that DSE still fetches every day's full table. |
+| `chunk` | `'year'` | `'year'` or `'month'` download granularity for CSE. Monthly = more, smaller requests (better retries, cheaper "last 3 months"). Validated against `CSE_CHUNK_SIZES = ('year', 'month')`; ignored for DSE (always per day). Cache keys include the chunk bounds, so year and month chunks never collide. |
+| `progress` | `True` | `True` -> one `print` per network chunk; `False` -> silent; callable -> called as `progress(chunk_from, chunk_to, index, total)` per network chunk (cache hits do not report). |
+| `use_cache` | `True` | `False` bypasses memory and disk caches for this call and does **not** write to them (use when the exchange restated a day). |
+
+- CSE: `_cse_day_end_frame(start, end, chunk, progress, use_cache)` (the native shape of the source).
 - DSE: iterate calendar days, call `parse_day_end_dse(day)`, skip empty days
   (weekends/holidays), concat. Documented as slower on DSE (one request per
   trading day).
-- `save_day_end_range_data(file_path, file_name, market, start_date, end_date)`
-  thin wrapper writing one xlsx, matching the other `save_*` helpers.
+- `save_day_end_range_data(file_path='', file_name='day_end_range.xlsx',
+  market='DSE', start_date=None, end_date=None, **kwargs)` thin wrapper writing
+  one xlsx; `kwargs` are passed through (`symbols`, `chunk`, `progress`,
+  `use_cache`).
+- `get_price_history_df(..., market='CSE')` reuses the same engine with the
+  defaults (`chunk='year'`, `progress=True`, `use_cache=True`); its signature
+  is unchanged so DSE callers see nothing new.
 - Batch drivers (`fetch_csebd_data.py`) use it once and split by
   `TRADING_CODE` instead of calling `save_history_data` per symbol.
 
@@ -233,6 +251,7 @@ Also introduce the small exception hierarchy the standards call for
 - [ ] AC-4: `get_day_end_df('2026-09-15', market='CSE')` returns >300 rows in the history schema.
 - [ ] AC-5: CSE history for `2021-01-03..2021-01-07` returns 5 rows; no-date call spans from 2015-11-24 (or the symbol's first trade) to today.
 - [ ] AC-5b: `get_day_end_range_df` returns the history schema for all symbols for both markets; the DSE variant skips non-trading days.
+- [ ] AC-5d: `symbols` filters the result; `chunk='month'` issues one request per month; `progress=False` is silent and a callable is invoked once per network chunk with `(from, to, index, total)`; `use_cache=False` re-downloads and does not populate the caches; invalid `chunk` raises `ValueError`.
 - [ ] AC-5c: with `cache_dir` set, a second `PriceData` instance serves closed years from disk with no network call (mocked session asserts zero POSTs for those chunks).
 - [ ] AC-6: `get_current_indices_df(market='CSE')` returns 5 rows; `get_index_history_df(market='CSE', ...)` returns DSE leading columns plus `CASPI, CSE30, CSCX, CSE50, CSI`.
 - [ ] AC-7: All pre-existing DSE tests pass without modification.
@@ -259,6 +278,10 @@ Also introduce the small exception hierarchy the standards call for
 | `test_cse_history_default_is_full_archive` | no dates -> chunks from 2015-11-24 to today | `tests/test_price_data.py` |
 | `test_cse_disk_cache_roundtrip` | `cache_dir` writes closed years, second instance reads them, current year not written | `tests/test_price_data.py` |
 | `test_day_end_range_cse` / `test_day_end_range_dse` | both markets, same columns; DSE skips empty days | `tests/test_price_data.py` |
+| `test_day_end_range_symbols_filter` | `symbols=['ACI','BRACBANK']` -> only those codes, case-insensitive | `tests/test_price_data.py` |
+| `test_day_end_range_month_chunks` | `chunk='month'` -> one POST per month; `chunk='week'` -> `ValueError` | `tests/test_price_data.py` |
+| `test_day_end_range_progress` | `progress=False` prints nothing (capsys); callable receives `(from, to, i, n)` per network chunk only | `tests/test_price_data.py` |
+| `test_day_end_range_use_cache_false` | cached chunk re-downloaded; caches untouched afterwards | `tests/test_price_data.py` |
 | `test_cse_day_end_all_symbols` | one-day fixture -> all rows | `tests/test_price_data.py` |
 | `test_cse_day_end_empty_range` | empty xlsx -> empty df with columns | `tests/test_price_data.py` |
 | `test_cse_current_matches_dse_schema` | live HTML fixture; `% CHANGE` computed; `OPEN` dropped | `tests/test_price_data.py` |
