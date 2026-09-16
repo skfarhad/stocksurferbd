@@ -55,7 +55,8 @@ Gap analysis performed on 2026-09-16 against the live CSE site:
    its day-end download and on each company page; `CLOSEP` is taken from the
    same-day download joined on code, falling back to `LTP` when the download
    has no rows for today yet. `% CHANGE` is computed as
-   `(LTP - YCP) / YCP * 100` rounded to 2 dp, matching DSE's published value.
+   `round(LTP - YCP, 2)`: verified live, DSE's column of that name holds the
+   absolute change, not a percentage, and CSE must mean the same thing.
    The CSE `OPEN` column is dropped from the default output (DSE has none).
 3. **Day-end for CSE:** `get_day_end_df(date, market='CSE')` returns the
    history schema for all symbols on that date, sourced from

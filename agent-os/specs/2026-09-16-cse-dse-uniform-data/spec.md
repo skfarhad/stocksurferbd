@@ -133,7 +133,7 @@ Sort: `DATE` descending, then `TRADING_CODE` ascending.
 | `STOCK CODE` | `TRADING_CODE` | as-is |
 | `LTP`, `HIGH`, `LOW`, `YCP`, `TRADE`, `VALUE(MN)`, `VOLUME` | same names | float via `parse_float` |
 | same-day download `close_price` joined on code; fallback `LTP` | `CLOSEP` | float |
-| computed | `% CHANGE` | `round((LTP - YCP) / YCP * 100, 2)`; `0.0` when `YCP == 0` |
+| computed | `% CHANGE` | `round(LTP - YCP, 2)`. **Verified live on 2026-09-16:** despite its name, DSE's `% CHANGE` column holds the absolute change (97% of 395 rows equal `LTP - YCP`; only 13% equal a true percentage), so CSE reproduces the same quantity. |
 | `OPEN` | dropped | not in DSE schema |
 
 **Index JSON -> current indices**: one POST per index in
@@ -157,7 +157,7 @@ Sort: `DATE` descending, then `TRADING_CODE` ascending.
   the `PriceData` instance. Any chunk whose `to >= today` is never cached.
 - **Disk cache (optional)**: new constructor argument `cache_dir=None` on
   `PriceData`. When set, each *closed* year chunk is stored as
-  `<cache_dir>/cse_day_end_<YYYY>.pkl` (pandas pickle; no new dependency) and
+  `<cache_dir>/cse_day_end_<from>_<to>.pkl` (pandas pickle; no new dependency; month and year chunks get distinct files) and
   loaded before any network call. Closed years are immutable on the exchange
   side, so no expiry is needed. The current year is never written to disk.
 - **Cost table** (documented in README):
