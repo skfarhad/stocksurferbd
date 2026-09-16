@@ -1,7 +1,7 @@
 # Task Breakdown: CSE/DSE Uniform Data
 
 **Spec**: `2026-09-16-cse-dse-uniform-data`
-**Status**: Implemented (2026-09-16) — pending `/run-tests` and manual smoke during a CSE session
+**Status**: Implemented and tested (2026-09-16): 82 passed / 0 failed; manual intraday CSE smoke still pending
 
 DSE output is canonical and must not change. Every task below makes CSE
 conform to it. Tests run offline against fixtures under `tests/fixtures/`;
@@ -253,3 +253,10 @@ run with `pytest tests/` from the repo root (see `tests/conftest.py`).
 - Still unverified: whether the CSE company download is populated **intraday**
   (all checks ran after 14:30 BD). The join-with-fallback design handles both
   cases; confirm during a session before wording the README more strongly.
+
+## Test Run (2026-09-16, `/run-tests`)
+
+- Command: `~/.venvs/stocksurferbd/bin/python -m pytest tests/ -v --cov=stocksurferbd_pkg/stocksurferbd`
+- Result: **82 passed, 0 failed** in 3.5 s (no network access in tests).
+- Coverage: total 72%; `price_data_scraper.py` 84%, `index_data_scraper.py` 84%, `utils.py` 97%.
+- The CSE index and price smoke tests against the live site also passed (see Session Notes).

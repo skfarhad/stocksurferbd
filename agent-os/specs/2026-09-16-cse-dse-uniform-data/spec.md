@@ -291,6 +291,28 @@ Also introduce the small exception hierarchy the standards call for
 | `test_cse_index_history` | xlsx fixture -> leading DSE columns + index columns, newest first | `tests/test_index_data.py` |
 | `test_invalid_market_*` | non-DSE/CSE -> `IOError` on every market-taking method | both |
 
+### Test results (2026-09-16, `pytest tests/ --cov=stocksurferbd_pkg/stocksurferbd`)
+
+82 passed, 0 failed (38 pre-existing tests unchanged). Coverage: total 72%;
+`price_data_scraper.py` 84%, `index_data_scraper.py` 84%, `utils.py` 97%
+(uncovered lines are live-network paths and DSE branches that predate this
+feature). Planned scenarios map to the implemented tests as follows:
+
+| Planned | Implemented in |
+|---------|----------------|
+| `test_cse_history_matches_dse_schema`, `test_cse_history_field_mapping` | `test_cse_download_to_history_matches_dse_schema`, `test_cse_download_to_history_field_mapping`, `test_cse_history_matches_dse_schema_and_filters_symbol` |
+| `test_cse_history_symbol_filter_and_range` | `test_cse_history_matches_dse_schema_and_filters_symbol`, `test_cse_history_range_is_inclusive_after_chunk_download` |
+| `test_cse_history_chunks_cached` | `test_cse_history_chunks_cached_per_instance` |
+| `test_cse_day_end_all_symbols`, `test_cse_day_end_empty_range` | `test_cse_day_end_single_day`, `test_cse_day_end_empty_download` |
+| `test_day_end_range_cse`, `test_day_end_range_dse`, `test_day_end_range_symbols_filter` | `test_day_end_range_cse_symbols_filter`, `test_day_end_range_dse_skips_empty_days` |
+| `test_cse_current_closep_from_download`, `test_cse_current_date_from_exchange` | `test_cse_current_matches_dse_schema`, `test_get_current_price_df_cse_uses_exchange_date_and_closes`, `test_get_current_price_df_cse_falls_back_to_company_page_date` |
+| `test_cse_current_indices`, `test_cse_index_history` | `test_parse_index_summary_cse`, `test_get_current_indices_df_cse`, `test_parse_index_history_cse`, `test_get_index_history_df_cse` |
+| chunking, progress, use_cache, disk cache, month chunks | `test_cse_year_chunks_are_whole_years_clipped_to_archive`, `test_cse_month_chunks_cross_year_boundary`, `test_cse_chunks_before_archive_or_bad_size`, `test_cse_current_year_chunk_ends_today`, `test_day_end_range_month_chunks`, `test_day_end_range_progress`, `test_day_end_range_use_cache_false`, `test_cse_disk_cache_roundtrip` |
+| utils | `tests/test_utils.py` (7 tests) |
+
+Test files: `tests/test_utils.py`, `tests/test_price_data.py`,
+`tests/test_index_data.py`; fixtures under `tests/fixtures/cse_*`.
+
 ### Integration (manual smoke, not CI)
 Live calls for ACI history (default and 2021 range), day-end 2026-09-15,
 current prices during and after the session, indices. Also verify whether the
