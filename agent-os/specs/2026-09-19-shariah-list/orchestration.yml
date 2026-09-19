@@ -1,0 +1,9 @@
+task_groups:
+  - name: Fixtures and test scaffolding
+    claude_code_subagent: general-purpose
+  - name: ShariahData scraper (registry, parsers, public API)
+    claude_code_subagent: general-purpose
+  - name: Tests
+    claude_code_subagent: general-purpose
+  - name: Docs, version, example script, roadmap
+    claude_code_subagent: general-purpose

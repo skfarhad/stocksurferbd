@@ -1,6 +1,16 @@
 # Feature Specification: Shariah List
 
 **Slug:** shariah-list | **Branch:** `feature/shariah-list` | **Created:** 2026-09-19
+**Status:** Planned (2026-09-19). Ready for `/execute shariah-list`.
+
+## Decisions (planning interview, 2026-09-19)
+
+| Topic | Decision |
+|-------|----------|
+| List frame shape | Code plus dates: `SOURCE, INDEX, TRADING_CODE, AS_OF_DATE, LIST_REVISED_DATE, LIST_EFFECTIVE_DATE`. No price columns (they overlap `PriceData`). Dates repeat per row so a saved xlsx is self-describing. |
+| Revision details | Separate `get_shariah_revision_df` / `save_shariah_revision` with `CHANGE` in `ADDED / EXCLUDED / SELECTED` and `COMPANY_NAME`. `get_shariah_list_info` also returns the counts, dates and lists as a dict. |
+| Unavailable source (DSE) | Registered in `SOURCES` with `parser=None`. Requesting it raises `IOError` explaining that DSE sells the DSES constituent list and pointing to `source='CSE'`. `list_sources()` shows `AVAILABLE=False`. |
+| Release housekeeping | Version 2.0.0 -> 2.1.0, CHANGELOG entry, README usage block and schema rows, root example script `fetch_shariah_list.py`, roadmap "Shipped" entry. |
 
 ## Overview
 
