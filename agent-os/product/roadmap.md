@@ -20,6 +20,11 @@ The library scrapes the public DSE/CSE websites, normalises the tables with `pan
    2015-11-24, chunked + cached, optional `cache_dir`); new
    `get_day_end_range_df` bulk method for both markets. Spec:
    `agent-os/specs/2026-09-16-cse-dse-uniform-data/`.
+8. [x] **Shariah-compliant company list (2.1.0, 2026-09-19)** — `ShariahData`
+   with a source registry: CSE Shariah Index (CSI) constituents plus the
+   latest revision (added / excluded / selected, revised and effective dates);
+   DSE registered as unavailable (DSES list is a paid product). Spec:
+   `agent-os/specs/2026-09-19-shariah-list/`.
 
 ## Phase 1: Wider fundamental coverage
 

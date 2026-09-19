@@ -3,7 +3,8 @@ This is a Python library based on *beautifulsoup4*, *pandas* &
 *mplfinance*.
 <br> You may use it to download price history and fundamental information of companies from 
 Dhaka Stock Exchange and Chittagong Stock Exchange, as well as market
-index data (DSE: DSEX, DSES, DS30, DGEN, CDSET; CSE: CASPI, CSE30, CSCX, CSE50, CSI).
+index data (DSE: DSEX, DSES, DS30, DGEN, CDSET; CSE: CASPI, CSE30, CSCX, CSE50, CSI)
+and the Shariah-compliant company list (CSE Shariah Index constituents).
 <br>**Data from both exchanges comes back in the same shape** (columns, order
 and types), so an application written against DSE output works for CSE unchanged.
 <br>This can assist you to create further analyses 
@@ -118,7 +119,7 @@ chunk='year', progress=True, use_cache=True)`:
 writes the same frame to one Excel file.
 
 These mirror the DataFrame-returning methods on `FundamentalData`,
-`BlockTradeData` and `IndexData`. `save_history_data` / `save_current_data`
+`BlockTradeData`, `IndexData` and `ShariahData`. `save_history_data` / `save_current_data`
 are thin wrappers over them, so file output is unchanged.
 
 > Note: the *live* current-price feeds do not publish an open price, so
@@ -279,6 +280,54 @@ serves the indices in a few different ways, so there are dedicated methods:
 > intraday or per-index graph source, so `save_intraday` / `save_index_graph`
 > raise for `market='CSE'`.
 
+#### Downloading the Shariah-compliant company list (CSE: CSI constituents)-
+
+```python
+from stocksurferbd import ShariahData
+loader = ShariahData()
+
+# Which sources are registered, and which of them are publicly available
+print(loader.list_sources()[['SOURCE', 'INDEX', 'AVAILABLE', 'ACCESS']])
+
+# Current CSE Shariah Index (CSI) constituents, one row per trading code,
+# with the trading date of the table and the dates the list was last revised
+loader.save_shariah_list(file_name='cse_shariah_list.xlsx', source='CSE')
+df = loader.get_shariah_list_df(source='CSE')
+
+# Latest revision: companies ADDED / EXCLUDED, plus the full SELECTED list
+# as named in CSE's "CSE Shariah Index revised" press release
+loader.save_shariah_revision(file_name='cse_shariah_revision.xlsx', source='CSE')
+
+# Metadata: counts, dates, added/excluded names, source provenance
+info = loader.get_shariah_list_info(source='CSE')
+print(info['constituent_count'], info['list_revised_date'], info['list_effective_date'])
+```
+
+`source` selects an entry of `ShariahData.SOURCES`, a registry that documents
+each source's URLs, provider, screening methodology, review cycle and access
+status. Adding a source later means one registry entry plus one fetcher; the
+methods above do not change.
+
+Three dates travel with the list:
+
+| Column | Meaning |
+|--------|---------|
+| `AS_OF_DATE` | trading date printed on the constituent table (moves every trading day) |
+| `LIST_REVISED_DATE` | date CSE announced the latest revision (press-release dateline) |
+| `LIST_EFFECTIVE_DATE` | date the revised list took effect in the index |
+
+> **Why CSE and not DSE?** DSE publishes only the DSES index *value*; the
+> constituent list is a paid product (The Financial Express, 2023-03-12:
+> Tk 0.5 million one-off plus Tk 0.12 million per year), and third-party
+> DSES component pages are login-gated or empty. `source='DSE'` is registered
+> so the status is discoverable, and raises with that explanation. CSE
+> screens all CSE-listed companies semi-annually and publishes the result
+> free. Nearly all DSE stocks are dual-listed on CSE, so CSI is a close but
+> not identical proxy for DSES (the screening methodologies differ).
+> The two list dates are `None` when the press release cannot be read; the
+> list itself is still returned. If the CSE certificate chain fails in your
+> environment, construct `ShariahData(verify=False)` (see *Configuration*).
+
 #### Create Candlestick charts for analyzing price history-
 
 ```python
@@ -381,6 +430,13 @@ One row per block transaction for the latest trading day:
 | `save_index_graph` | `INDEX`, `DATE`, `POINTS` |
 | `save_current_indices` | `INDEX`, `POINTS`, `CHANGE`, `PCT_CHANGE` (one row per index; `CHANGE`/`PCT_CHANGE` are blank for `CDSET`; both markets) |
 | `save_intraday` | `INDEX`, `DATETIME`, `POINTS` |
+
+#### Shariah-compliant list — `ShariahData` *(new in 2.1.0)*
+| Method | Columns |
+|--------|---------|
+| `save_shariah_list` / `get_shariah_list_df` | `SOURCE`, `INDEX`, `TRADING_CODE`, `AS_OF_DATE`, `LIST_REVISED_DATE`, `LIST_EFFECTIVE_DATE` (one row per constituent) |
+| `save_shariah_revision` / `get_shariah_revision_df` | `SOURCE`, `INDEX`, `LIST_REVISED_DATE`, `LIST_EFFECTIVE_DATE`, `CHANGE` (`ADDED` / `EXCLUDED` / `SELECTED`), `COMPANY_NAME` (name as written in the announcement, not a trading code) |
+| `list_sources` | `SOURCE`, `MARKET`, `INDEX`, `AVAILABLE`, `PROVIDER`, `REVIEW_CYCLE`, `ACCESS`, `LIST_URL`, `REVISION_URL`, `NOTES` |
 
 #### Block-trade news proxy — `BlockTradeData.save_block_trade_news_data` → `<symbol>_block_trade_news.xlsx` *(new in 1.0.0)*
 Block-market related disclosures (a filtered view of the news feed):

@@ -8,3 +8,5 @@ from .stocksurferbd import PriceData
 from .stocksurferbd import FundamentalData
 from .stocksurferbd import BlockTradeData
 from .stocksurferbd import CandlestickPlot
+from .stocksurferbd import IndexData
+from .stocksurferbd import ShariahData
