@@ -9,4 +9,5 @@ from .price_data_scraper import PriceData
 from .fundamental_data_scraper import FundamentalData
 from .block_trade_scraper import BlockTradeData
 from .index_data_scraper import IndexData
+from .shariah_data_scraper import ShariahData
 from .price_plots import CandlestickPlot
