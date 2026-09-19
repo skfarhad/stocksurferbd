@@ -22,7 +22,7 @@ All notable changes to this project are documented here. The format is based on
   raises with that explanation and points to `source='CSE'`.
 - `fetch_shariah_list.py` example script; `ShariahData` and `IndexData` are
   now also importable from the `stocksurferbd_pkg` shim used by the examples.
-- Offline CSE fixtures and 25 new tests (107 total).
+- Offline CSE fixtures and 28 new tests (110 total).
 
 ## [2.0.0] - 2026-09-16
 

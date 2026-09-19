@@ -1,7 +1,7 @@
 # Task Breakdown: Shariah List
 
 **Spec**: `2026-09-19-shariah-list`
-**Status**: Implemented and tested (2026-09-19): 107 passed / 0 failed (82 existing + 25 new); live CSE smoke passed (103 constituents, revision #332 parsed)
+**Status**: Implemented and tested (2026-09-19): 110 passed / 0 failed (82 existing + 28 new), shariah_data_scraper.py at 100% coverage; live CSE smoke passed (103 constituents, revision #332 parsed)
 
 Adds `ShariahData`, a source-parameterised scraper for Shariah-compliant
 company lists. CSE (CSI) is the only implemented source; DSE (DSES) is
@@ -114,6 +114,7 @@ fixtures under `tests/fixtures/`; run with `pytest tests/` from the repo root.
 
 **Acceptance Criteria**:
 - New tests pass; the existing 82 tests still pass (`pytest tests/`).
+- Result (2026-09-19): 110 passed, 0 failed; `shariah_data_scraper.py` 100% statement coverage, package 77%.
 
 ---
 

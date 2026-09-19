@@ -1,7 +1,7 @@
 # Feature Specification: Shariah List
 
 **Slug:** shariah-list | **Branch:** `feature/shariah-list` | **Created:** 2026-09-19
-**Status:** Implemented (2026-09-19). 107 tests pass (25 new); live CSE smoke verified 103 CSI constituents with revision and effective dates from press release #332.
+**Status:** Implemented and tested (2026-09-19). 110 tests pass (28 new), new module at 100% coverage; live CSE smoke verified 103 CSI constituents with revision and effective dates from press release #332.
 
 ## Decisions (planning interview, 2026-09-19)
 
@@ -208,9 +208,11 @@ Fixture-based, no network (mirrors `tests/test_index_data.py`):
 
 ---
 
-## Test results (2026-09-19, `pytest tests/`)
+## Test results (2026-09-19, `pytest tests/ --cov=stocksurferbd_pkg/stocksurferbd`)
 
-- 107 passed, 0 failed (82 pre-existing + 25 new in `tests/test_shariah_data.py`).
+- **110 passed, 0 failed** (82 pre-existing + 28 new in `tests/test_shariah_data.py`).
+- Coverage: `shariah_data_scraper.py` 100% (185 statements); package total 77%
+  (up from 76%; the remainder is pre-existing, mostly `price_plots.py`).
 - Parsers additionally checked ad hoc against the live releases #250, #273,
   #292, #315 and #332: every dateline, effective date, added/excluded list and
   "N out of M" count parsed; the selected count matched `N` in all five.
@@ -219,6 +221,20 @@ Fixture-based, no network (mirrors `tests/test_index_data.py`):
   3 added / 12 excluded / 103 selected of 383; `source='DSE'` raised the
   paid-status `IOError`. Default `verify=True` failed on the CSE certificate
   chain in this environment (same as DSE, already documented in README).
+
+### Planned -> implemented test mapping
+
+| Planned (Test Plan) | Implemented in `tests/test_shariah_data.py` |
+|---------------------|---------------------------------------------|
+| `test_parse_constituents_cse` | same |
+| `test_parse_constituents_cse_ignores_other_tables` | same (also selects `CSE 30` by title) |
+| `test_parse_constituents_cse_missing_table` | same, plus `test_parse_constituents_cse_title_without_date` (x2) and `test_parse_constituents_cse_empty_table` |
+| `test_find_latest_revision_url_cse` | same, plus `test_find_latest_revision_url_cse_none` |
+| `test_parse_revision_cse_332` / `_273_no_additions` | same, plus `test_parse_revision_cse_footer_without_for_detail` (#315 wording), `test_parse_revision_cse_unmatched_wording_degrades`, `test_parse_revision_cse_missing_block`, `test_split_names` |
+| `test_get_shariah_list_df_cse` | same, plus `test_get_shariah_list_df_source_case_insensitive` |
+| `test_get_shariah_list_df_cse_revision_unavailable` | same, plus `test_get_shariah_list_df_cse_no_revision_item` and `test_get_shariah_list_df_cse_list_page_down` |
+| `test_get_shariah_revision_df_cse`, `test_get_shariah_list_info_cse` | same, plus `test_save_shariah_list_and_revision` |
+| `test_list_sources`, `test_unavailable_source_dse`, `test_unknown_source` | same; `test_unknown_source` is `test_unknown_source_raises` (parametrised over three methods), plus `test_registry_entries_are_complete` |
 
 ## Rollout
 

@@ -72,10 +72,24 @@ def test_parse_constituents_cse_missing_table():
         ShariahData.parse_constituents_cse("<html><table><tr><th>Other</th></tr></table></html>")
 
 
-def test_parse_constituents_cse_title_without_date():
-    html = ('<table><thead><tr><th>CSI Share by Company Name</th></tr></thead>'
+@pytest.mark.parametrize("title", [
+    "CSI Share by Company Name",                     # no " on <date>"
+    "CSI Share by Company Name on Someday Soon",     # unparseable date
+])
+def test_parse_constituents_cse_title_without_date(title):
+    html = (f'<table><thead><tr><th>{title}</th></tr></thead>'
             '<tbody><tr><td>1</td><td>ABC</td></tr></tbody></table>')
     with pytest.raises(ParseError):
+        ShariahData.parse_constituents_cse(html)
+
+
+def test_parse_constituents_cse_empty_table():
+    # Tables without a <th> are skipped; a titled table with no code rows fails.
+    html = ('<table><tr><td>no header here</td></tr></table>'
+            '<table><thead><tr><th>CSI Share by Company Name on May 1, 2026</th></tr>'
+            '<tr><th>SL.</th><th>STOCK CODE</th></tr></thead>'
+            '<tbody><tr><td>only one cell</td></tr></tbody></table>')
+    with pytest.raises(ParseError, match="no rows"):
         ShariahData.parse_constituents_cse(html)
 
 
@@ -204,6 +218,17 @@ def test_get_shariah_list_df_cse_revision_unavailable(
     # The revision frame is empty but well-formed in the same situation.
     rev = loader.get_shariah_revision_df()
     assert rev.empty and list(rev.columns) == ShariahData.REVISION_COLUMNS
+
+
+def test_get_shariah_list_df_cse_no_revision_item(cse_sectorindexdata_html, capsys):
+    # Listing reachable but without a "Shariah Index revised" item: warn, keep list.
+    loader = _fake_get(ShariahData(), {
+        LIST_URL: cse_sectorindexdata_html,
+        REVISION_URL: '<div class="media_list_title"><a href="x">Other news</a></div>',
+    })
+    df = loader.get_shariah_list_df()
+    assert len(df) == 103 and df["LIST_REVISED_DATE"].isna().all()
+    assert "Shariah Index revised" in capsys.readouterr().out
 
 
 def test_get_shariah_list_df_cse_list_page_down(cse_sectorindexdata_html):
