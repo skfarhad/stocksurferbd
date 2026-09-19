@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-09-19
+
+### Added
+- **`ShariahData`**: the Shariah-compliant company list from a named source.
+  `get_shariah_list_df` / `save_shariah_list` return one row per constituent
+  with `SOURCE, INDEX, TRADING_CODE, AS_OF_DATE, LIST_REVISED_DATE,
+  LIST_EFFECTIVE_DATE`; `get_shariah_revision_df` / `save_shariah_revision`
+  return the latest revision (`ADDED` / `EXCLUDED` / `SELECTED` company
+  names); `get_shariah_list_info` returns counts, dates and provenance.
+- **Source registry `ShariahData.SOURCES`** with `list_sources()`. Each entry
+  documents URLs, provider, screening methodology, review cycle and access
+  status and names its fetcher, so a new source is a registry entry plus one
+  fetcher. `CSE` (CSI constituents from the CSE indices page plus the latest
+  "CSE Shariah Index revised" press release) is implemented. `DSE` (DSES) is
+  registered as unavailable: DSE sells its constituent list, so requesting it
+  raises with that explanation and points to `source='CSE'`.
+- `fetch_shariah_list.py` example script; `ShariahData` and `IndexData` are
+  now also importable from the `stocksurferbd_pkg` shim used by the examples.
+- Offline CSE fixtures and 25 new tests (107 total).
+
 ## [2.0.0] - 2026-09-16
 
 **CSE data now comes back in the same shape as DSE data.** Code written against

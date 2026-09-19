@@ -1,7 +1,7 @@
 # Feature Specification: Shariah List
 
 **Slug:** shariah-list | **Branch:** `feature/shariah-list` | **Created:** 2026-09-19
-**Status:** Planned (2026-09-19). Ready for `/execute shariah-list`.
+**Status:** Implemented (2026-09-19). 107 tests pass (25 new); live CSE smoke verified 103 CSI constituents with revision and effective dates from press release #332.
 
 ## Decisions (planning interview, 2026-09-19)
 
@@ -9,7 +9,7 @@
 |-------|----------|
 | List frame shape | Code plus dates: `SOURCE, INDEX, TRADING_CODE, AS_OF_DATE, LIST_REVISED_DATE, LIST_EFFECTIVE_DATE`. No price columns (they overlap `PriceData`). Dates repeat per row so a saved xlsx is self-describing. |
 | Revision details | Separate `get_shariah_revision_df` / `save_shariah_revision` with `CHANGE` in `ADDED / EXCLUDED / SELECTED` and `COMPANY_NAME`. `get_shariah_list_info` also returns the counts, dates and lists as a dict. |
-| Unavailable source (DSE) | Registered in `SOURCES` with `parser=None`. Requesting it raises `IOError` explaining that DSE sells the DSES constituent list and pointing to `source='CSE'`. `list_sources()` shows `AVAILABLE=False`. |
+| Unavailable source (DSE) | Registered in `SOURCES` with `fetcher=None`. Requesting it raises `IOError` explaining that DSE sells the DSES constituent list and pointing to `source='CSE'`. `list_sources()` shows `AVAILABLE=False`. |
 | Release housekeeping | Version 2.0.0 -> 2.1.0, CHANGELOG entry, README usage block and schema rows, root example script `fetch_shariah_list.py`, roadmap "Shipped" entry. |
 
 ## Overview
@@ -72,8 +72,8 @@ publicly available.
 ShariahData(HttpScraper)
 ├── SOURCES = {                      # registry: data, not code
 │     "CSE": {market, index="CSI", list_url, revision_url, provider,
-│             screening, review_cycle, access, notes, parser="_fetch_cse"},
-│     "DSE": {market, index="DSES", ..., access="paid", parser=None},
+│             screening, review_cycle, access, notes, fetcher="_fetch_cse"},
+│     "DSE": {market, index="DSES", ..., access="paid", fetcher=None},
 │   }
 ├── list_sources()                   -> DataFrame (one row per source)
 ├── get_shariah_list_df(source)      -> DataFrame LIST_COLUMNS
@@ -82,7 +82,7 @@ ShariahData(HttpScraper)
 ├── save_shariah_list(...)           -> xlsx
 ├── save_shariah_revision(...)       -> xlsx
 │
-├── _check_source(source)            # validates, resolves parser or raises
+├── _check_source(source)            # validates, resolves fetcher or raises
 ├── _fetch_cse()                     # GET list page + latest release
 │
 └── classmethod parsers (pure, fixture-testable)
@@ -135,16 +135,23 @@ release is unavailable.
 - Release body: the `div.media_list_short_details` text, whitespace-collapsed,
   entities unescaped. Regexes (case-insensitive, tolerant of `has/have`,
   `is/are`, `company/companies`, zero-padded counts and optional commas):
-  - revised: `^Dhaka,\s*(?P<d>[A-Za-z]+ \d{1,2}, \d{4})`
-  - effective: `effective from\s+(?P<d>[\w ,]+?\d{4})`
+  - revised: `Dhaka,\s*([A-Za-z]+\s+\d{1,2},\s*\d{4})\s*:`
+  - effective: `effective\s+from\s+(\d{1,2}\s+[A-Za-z]+,?\s+\d{4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})`
   - added: `included (?:is|are)\s+(?P<names>.+?)\.\s+On the other hand` and
     `No new company has been included` -> `[]`
   - excluded: `i\.e\.,?\s*(?P<names>.+?),?\s+were excluded`
-  - selected: `(?P<n>\d+) listed companies out of (?P<m>\d+) listed
-    Companies have been selected\.\s*These are-?\s*(?P<names>.+?)\.?\s*(?:For
-    detail|$)`
-  - Name lists split on `,` and a final ` and `/` AND `, trimming whitespace
-    and trailing periods only when they are list separators (keep `LTD.`).
+  - selected: `(\d+)\s+listed\s+companies\s+out\s+of\s+(\d+)\s+listed\s+companies\s+
+    have\s+been\s+selected\.?\s*These\s+are[-\u2013:\s]*(.+)$` followed by the
+    footer strip described below
+  - Name lists split on `,` and, in the last piece only, at its first ` and `
+    (company names themselves contain "and"). Every name is normalised by
+    stripping surrounding whitespace and trailing `.`/`,`, so `LTD.` and `LTD`
+    compare equal whether or not the name ended the sentence.
+  - The selected list runs to the end of the release; a contact footer follows
+    ("For detail please contact: ..." or, in #315, directly "Tania Begum
+    Assistant Manager ..."). It is cut at the first footer marker, then a
+    leftover person name after the sentence end is dropped unless it contains
+    a company word (protects "Kohinoor Chemical Co. (BD) Ltd.").
 - Any regex miss leaves that field `None`/`[]`; the method still returns.
 
 ### HTTP
@@ -200,6 +207,18 @@ Fixture-based, no network (mirrors `tests/test_index_data.py`):
 - `test_list_sources`, `test_unavailable_source_dse`, `test_unknown_source`
 
 ---
+
+## Test results (2026-09-19, `pytest tests/`)
+
+- 107 passed, 0 failed (82 pre-existing + 25 new in `tests/test_shariah_data.py`).
+- Parsers additionally checked ad hoc against the live releases #250, #273,
+  #292, #315 and #332: every dateline, effective date, added/excluded list and
+  "N out of M" count parsed; the selected count matched `N` in all five.
+- Live smoke (`ShariahData(verify=False)`): 103 CSI constituents as of
+  2026-09-19, revised 2026-05-19, effective 2026-06-03, revision #332 with
+  3 added / 12 excluded / 103 selected of 383; `source='DSE'` raised the
+  paid-status `IOError`. Default `verify=True` failed on the CSE certificate
+  chain in this environment (same as DSE, already documented in README).
 
 ## Rollout
 
