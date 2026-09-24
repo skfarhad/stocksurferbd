@@ -14,7 +14,7 @@ import datetime
 from dateutil import parser
 import urllib.parse as parse_url
 
-from .utils import HttpScraper, StockSurferError, ParseError, read_xlsx_bytes
+from .utils import DSE_BASE_URL, HttpScraper, StockSurferError, ParseError, read_xlsx_bytes
 
 
 class PriceData(HttpScraper):
@@ -36,9 +36,9 @@ class PriceData(HttpScraper):
 
     VALID_MARKETS = ('DSE', 'CSE')
 
-    HISTORY_URL_DSE = "https://www.dsebd.org/day_end_archive.php?endDate=<date>&archive=data"
-    CURRENT_PRICE_URL_DSE = 'https://www.dsebd.org/latest_share_price_scroll_l.php'
-    CKT_BREAKER_URL_DSE = 'https://www.dsebd.org/cbul.php'
+    HISTORY_URL_DSE = f"{DSE_BASE_URL}/day_end_archive.php?endDate=<date>&archive=data"
+    CURRENT_PRICE_URL_DSE = f'{DSE_BASE_URL}/latest_share_price_scroll_l.php'
+    CKT_BREAKER_URL_DSE = f'{DSE_BASE_URL}/cbul.php'
 
     CURRENT_PRICE_URL_CSE = 'https://www.cse.com.bd/market/current_price'
     HISTORICAL_DATA_PAGE_CSE = 'https://www.cse.com.bd/market/historicaldata'

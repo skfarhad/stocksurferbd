@@ -24,13 +24,20 @@ arguments to control the underlying HTTP request:
 ```python
 from stocksurferbd import PriceData
 
-# DSE's certificate chain is incomplete in some environments; disable TLS
-# verification, reuse a session, or set a custom timeout if needed.
+# Disable TLS verification (or pass a CA bundle path), reuse a session, or
+# set a custom timeout if needed.
 loader = PriceData(verify=False, session=None, timeout=60)
 ```
 
 Defaults (`verify=True`, a fresh `requests.Session`, 30s timeout) preserve the
-previous behaviour.
+previous behaviour. With `verify=True`, requests are verified against certifi's
+bundle plus the intermediate certificate DSE's server fails to send, so no
+`verify=False` is needed for DSE.
+
+> **DSE source (2.1.1+):** DSE launched a new website at www.dsebd.org in
+> September 2026, which removed the legacy pages this library parses. DSE data
+> is now read from the legacy site at `https://old.dsebd.org`
+> (`stocksurferbd.utils.DSE_BASE_URL`), which DSE is keeping online for now.
 
 `PriceData` also accepts `cache_dir=None`. When set, closed CSE download chunks
 (past years/months) are stored there as pandas pickles and reused by later

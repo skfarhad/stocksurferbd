@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-09-24
+
+### Fixed
+- **DSE data works again.** DSE replaced www.dsebd.org with a new website on
+  2026-09-24; every legacy page the DSE scrapers read (`day_end_archive.php`,
+  `latest_share_price_scroll_l.php`, `displayCompany.php`, `old_news.php`,
+  `recent_market_information*.php`, `market-statistics.php`, `cbul.php`, the
+  index graph and the home page) now returns 404 there. All DSE URLs now point
+  at the legacy site, still served at `https://old.dsebd.org`, through a single
+  `stocksurferbd.utils.DSE_BASE_URL`. Output schemas are unchanged.
+- **TLS verification against old.dsebd.org.** The server omits its
+  intermediate certificate (Sectigo Public Server Authentication CA DV R36), so
+  `verify=True` failed with "unable to get local issuer certificate". The
+  intermediate now ships with the package and `verify=True` uses certifi's
+  bundle plus that certificate (`stocksurferbd.utils.ca_bundle()`).
+  `verify=False` or a CA-bundle path is still passed through unchanged.
+
 ## [2.1.0] - 2026-09-19
 
 ### Added

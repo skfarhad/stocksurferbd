@@ -40,19 +40,19 @@ import pandas as pd
 from dateutil import parser
 from bs4 import BeautifulSoup
 
-from .utils import HttpScraper, ParseError, parse_float, parse_int, read_xlsx_bytes
+from .utils import DSE_BASE_URL, HttpScraper, ParseError, parse_float, parse_int, read_xlsx_bytes
 
 
 class IndexData(HttpScraper):
     VALID_MARKETS = ("DSE", "CSE")
 
     # Rolling ~30-day table (no date range).
-    INDEX_HISTORY_URL_DSE = "https://www.dsebd.org/recent_market_information.php"
+    INDEX_HISTORY_URL_DSE = f"{DSE_BASE_URL}/recent_market_information.php"
     # Same table, but accepts a startDate/endDate POST -> full archive (2010+).
-    INDEX_ARCHIVE_URL_DSE = "https://www.dsebd.org/recent_market_information_more.php"
-    HOME_URL_DSE = "https://www.dsebd.org/"
+    INDEX_ARCHIVE_URL_DSE = f"{DSE_BASE_URL}/recent_market_information_more.php"
+    HOME_URL_DSE = f"{DSE_BASE_URL}/"
     # Per-index daily close series by month-count (the only history for CDSET).
-    GRAPH_URL_DSE = "https://www.dsebd.org/php_graph/monthly_graph_index.php"
+    GRAPH_URL_DSE = f"{DSE_BASE_URL}/php_graph/monthly_graph_index.php"
 
     SUPPORTED_INDICES = ("DSEX", "DSES", "DS30", "CDSET")
 

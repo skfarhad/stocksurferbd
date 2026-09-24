@@ -18,7 +18,7 @@ def test_get_history_url_default_is_unchanged():
     url = PriceData().get_history_url()
     today = PriceData.get_date()
     assert url == (
-        "https://www.dsebd.org/day_end_archive.php"
+        "https://old.dsebd.org/day_end_archive.php"
         f"?endDate={today}&archive=data"
     )
     assert "startDate" not in url
