@@ -11,13 +11,13 @@ from bs4 import BeautifulSoup
 from dateutil import parser
 from dateutil.relativedelta import relativedelta
 
-from .utils import HttpScraper
+from .utils import DSE_BASE_URL, HttpScraper
 
 
 class FundamentalData(HttpScraper):
-    DSE_COMPANY_URL = "https://dsebd.org/displayCompany.php?name="
-    CURRENT_PRICE_URL = 'https://www.dsebd.org/dseX_share.php'
-    NEWS_URL = "https://www.dsebd.org/old_news.php?archive=news&criteria=3&inst="
+    DSE_COMPANY_URL = f"{DSE_BASE_URL}/displayCompany.php?name="
+    CURRENT_PRICE_URL = f'{DSE_BASE_URL}/dseX_share.php'
+    NEWS_URL = f"{DSE_BASE_URL}/old_news.php?archive=news&criteria=3&inst="
 
     @staticmethod
     def parse_float(str_val):

@@ -2,11 +2,12 @@
 
 import re
 
+import certifi
 import pytest
 import requests
 
 from stocksurferbd import FetchError, ParseError
-from stocksurferbd.utils import HttpScraper, read_xlsx_bytes
+from stocksurferbd.utils import _SECTIGO_DV_R36_PEM, HttpScraper, read_xlsx_bytes
 
 
 class _Resp:
@@ -96,3 +97,22 @@ def test_read_xlsx_bytes_parses_download(cse_day_end_bytes):
     df = read_xlsx_bytes(cse_day_end_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert {"trade_date", "company_code", "open_price", "close_price"} <= set(df.columns)
     assert len(df) > 300
+
+
+def test_verify_true_uses_bundle_with_dse_intermediate():
+    # old.dsebd.org omits its intermediate cert; the default bundle adds it.
+    sess = _Session(get_resp=_Resp(text=""))
+    HttpScraper(session=sess)._get("https://old.dsebd.org/")
+
+    path = sess.gets[0]["verify"]
+    with open(path, encoding="ascii") as fh:
+        bundle = fh.read()
+    assert bundle.startswith(open(certifi.where(), encoding="ascii").read()[:200])
+    assert _SECTIGO_DV_R36_PEM.strip() in bundle
+
+
+def test_verify_path_or_false_passed_through():
+    sess = _Session(get_resp=_Resp(text=""))
+    HttpScraper(session=sess, verify="/my/ca.pem")._get("https://x/")
+    HttpScraper(session=sess, verify=False)._get("https://x/")
+    assert [g["verify"] for g in sess.gets] == ["/my/ca.pem", False]

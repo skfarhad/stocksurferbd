@@ -10,7 +10,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 from .fundamental_data_scraper import FundamentalData
-from .utils import HttpScraper, parse_float, parse_int
+from .utils import DSE_BASE_URL, HttpScraper, parse_float, parse_int
 
 
 class BlockTradeData(HttpScraper):
@@ -28,7 +28,7 @@ class BlockTradeData(HttpScraper):
        years. These are disclosures, not raw trade tickets.
     """
 
-    MARKET_STATS_URL_DSE = 'https://www.dsebd.org/market-statistics.php'
+    MARKET_STATS_URL_DSE = f'{DSE_BASE_URL}/market-statistics.php'
     BLOCK_KEYWORDS = ('block',)
     VALID_MARKETS = ('DSE',)
 
