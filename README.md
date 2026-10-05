@@ -241,7 +241,7 @@ variants that return a `pandas` DataFrame instead of writing a file.
 from stocksurferbd import IndexData
 loader = IndexData()
 
-# Rolling ~30 trading days of day-wise index values (DSEX, DSES, DS30, DGEN)
+# Rolling ~30 trading days of day-wise index values (DSEX, DSES, DS30; DGEN only in the dated archive)
 loader.save_index_history(file_name='index_data.xlsx', market='DSE')
 
 # Full historical archive for any date range (data available from ~2010 onward)
@@ -433,7 +433,7 @@ One row per block transaction for the latest trading day:
 #### Market indices — `IndexData`
 | Method | Columns |
 |--------|---------|
-| `save_index_history` | `DATE`, `TOTAL_TRADE`, `TOTAL_VOLUME`, `VALUE_MN`, `MARKET_CAP_MN`, then one column per index: `DSEX`, `DSES`, `DS30`, `DGEN` (DSE) or `CASPI`, `CSE30`, `CSCX`, `CSE50`, `CSI` (CSE) |
+| `save_index_history` | `DATE`, `TOTAL_TRADE`, `TOTAL_VOLUME`, `VALUE_MN`, `MARKET_CAP_MN`, then one column per index: `DSEX`, `DSES`, `DS30`, `DGEN` (DSE, plus a trailing `EQUITY_MARKET_CAP_MN` — equity-only market cap, blank where the page does not publish it) or `CASPI`, `CSE30`, `CSCX`, `CSE50`, `CSI` (CSE). DSE columns are matched by header text, so a column DSE adds, drops or reorders never shifts values between fields |
 | `save_index_graph` | `INDEX`, `DATE`, `POINTS` |
 | `save_current_indices` | `INDEX`, `POINTS`, `CHANGE`, `PCT_CHANGE` (one row per index; `CHANGE`/`PCT_CHANGE` are blank for `CDSET`; both markets) |
 | `save_intraday` | `INDEX`, `DATETIME`, `POINTS` |

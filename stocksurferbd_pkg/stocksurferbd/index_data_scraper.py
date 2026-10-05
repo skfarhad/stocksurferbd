@@ -98,10 +98,28 @@ class IndexData(HttpScraper):
         "CDSET": "index_value_cdset",
     }
 
-    # Column order of the day-wise table as published by DSE.
+    # Output columns of the DSE day-wise table. The page's own column order
+    # and header wording have changed over time (the rolling page gained an
+    # "Equity Securities" market-cap sub-column and dropped DGEN in 2026), so
+    # cells are mapped by header text, never by position. Columns the page
+    # does not publish come back as None.
     _HISTORY_COLUMNS = (
         "DATE", "TOTAL_TRADE", "TOTAL_VOLUME", "VALUE_MN",
         "MARKET_CAP_MN", "DSEX", "DSES", "DS30", "DGEN",
+        "EQUITY_MARKET_CAP_MN",
+    )
+    _HISTORY_REQUIRED_COLUMNS = ("DATE", "DSEX")
+    _HISTORY_INDEX_NAMES = ("DSEX", "DSES", "DS30", "DGEN")
+    # (predicate on the normalised header label) -> output column, first match
+    # wins. "Equity" is tested before "market cap" because the equity sub-column
+    # label also contains the parent "Market Capitalization" heading.
+    _HISTORY_HEADER_RULES = (
+        (lambda label: label.startswith("date"), "DATE"),
+        (lambda label: "total trade" in label, "TOTAL_TRADE"),
+        (lambda label: "total volume" in label, "TOTAL_VOLUME"),
+        (lambda label: "total value" in label, "VALUE_MN"),
+        (lambda label: "equity" in label, "EQUITY_MARKET_CAP_MN"),
+        (lambda label: "market cap" in label, "MARKET_CAP_MN"),
     )
 
     @staticmethod
@@ -162,32 +180,125 @@ class IndexData(HttpScraper):
             return value.strftime("%Y-%m-%d")
         return parser.parse(str(value)).strftime("%Y-%m-%d")
 
+    @staticmethod
+    def _cell_text(cell):
+        return " ".join(cell.get_text().split())
+
+    @classmethod
+    def _flatten_header(cls, header_rows):
+        """Resolve a one- or multi-row ``<th>`` header into one label per column.
+
+        ``colspan`` spreads a heading over several columns and ``rowspan``
+        carries it down into the next header row, so a two-level header such
+        as "Market Capitalization" over "Equity Securities" / "Total Market
+        Cap." flattens to one combined label per leaf column.
+        """
+        grid = {}
+        for row_no, row in enumerate(header_rows):
+            col = 0
+            for cell in row.find_all(["th", "td"]):
+                while (row_no, col) in grid:
+                    col += 1
+                text = cls._cell_text(cell)
+                for dr in range(int(cell.get("rowspan", 1))):
+                    for dc in range(int(cell.get("colspan", 1))):
+                        grid[(row_no + dr, col + dc)] = text
+                col += int(cell.get("colspan", 1))
+        width = max((c for _, c in grid), default=-1) + 1
+        labels = []
+        for col in range(width):
+            parts = []
+            for row_no in range(len(header_rows)):
+                text = grid.get((row_no, col), "")
+                if text and text not in parts:
+                    parts.append(text)
+            labels.append(" ".join(parts))
+        return labels
+
+    @classmethod
+    def _history_column_for(cls, label):
+        normalised = re.sub(r"[^a-z0-9 ]", " ", label.lower())
+        normalised = re.sub(r"\s+", " ", normalised).strip()
+        for name in cls._HISTORY_INDEX_NAMES:
+            if re.search(rf"\b{name.lower()}\b", normalised):
+                return name
+        for matches, column in cls._HISTORY_HEADER_RULES:
+            if matches(normalised):
+                return column
+        return None
+
+    @classmethod
+    def _split_header_and_body(cls, table):
+        rows = table.find_all("tr")
+        header_rows = []
+        for row in rows:
+            if row.find("td") is not None:
+                break
+            if row.find("th") is not None:
+                header_rows.append(row)
+        return header_rows, rows[len(header_rows):]
+
+    @classmethod
+    def _history_column_positions(cls, header_rows):
+        labels = cls._flatten_header(header_rows)
+        positions = {}
+        for index, label in enumerate(labels):
+            column = cls._history_column_for(label)
+            if column is not None and column not in positions:
+                positions[column] = index
+        missing = [c for c in cls._HISTORY_REQUIRED_COLUMNS if c not in positions]
+        if missing:
+            raise ValueError(
+                f"DSE index time-series header is missing {missing}; "
+                f"found columns {labels}. The page layout may have changed."
+            )
+        return positions, len(labels)
+
+    @classmethod
+    def _history_record(cls, cells, positions):
+        def cell(column):
+            index = positions.get(column)
+            return cells[index] if index is not None else ""
+
+        def integer(column):
+            text = cell(column)
+            return parse_int(text) if text not in ("", "-", "--") else None
+
+        record = {
+            "DATE": parser.parse(cell("DATE"), dayfirst=True).date(),
+            "TOTAL_TRADE": integer("TOTAL_TRADE"),
+            "TOTAL_VOLUME": integer("TOTAL_VOLUME"),
+        }
+        for column in cls._HISTORY_COLUMNS:
+            if column not in record:
+                record[column] = cls._num(cell(column))
+        return record
+
     @classmethod
     def parse_index_history(cls, soup):
-        """Parse the day-wise index table from a fetched page's soup."""
+        """Parse the day-wise index table from a fetched page's soup.
+
+        Columns are located by header text, so the result is the same whether
+        the page is the rolling 30-day table or the dated archive, and a
+        column DSE adds, drops or reorders cannot shift values into the wrong
+        field. A body row whose cell count differs from the header's is
+        skipped.
+        """
         table = cls._find_history_table(soup)
         if table is None:
             raise ValueError(
                 "Could not locate the DSE index time-series table; the page "
                 "layout may have changed."
             )
+        header_rows, body_rows = cls._split_header_and_body(table)
+        positions, width = cls._history_column_positions(header_rows)
         dict_list = []
-        for row in table.find_all("tr")[1:]:  # skip header
-            cells = [" ".join(c.get_text().split()) for c in row.find_all("td")]
-            if len(cells) < len(cls._HISTORY_COLUMNS):
+        for row in body_rows:
+            cells = [cls._cell_text(c) for c in row.find_all("td")]
+            if len(cells) != width:
                 continue
             try:
-                dict_list.append({
-                    "DATE": parser.parse(cells[0], dayfirst=True).date(),
-                    "TOTAL_TRADE": parse_int(cells[1]) if cells[1] not in ("", "-") else None,
-                    "TOTAL_VOLUME": parse_int(cells[2]) if cells[2] not in ("", "-") else None,
-                    "VALUE_MN": cls._num(cells[3]),
-                    "MARKET_CAP_MN": cls._num(cells[4]),
-                    "DSEX": cls._num(cells[5]),
-                    "DSES": cls._num(cells[6]),
-                    "DS30": cls._num(cells[7]),
-                    "DGEN": cls._num(cells[8]),
-                })
+                dict_list.append(cls._history_record(cells, positions))
             except Exception as e:  # keep parsing remaining rows
                 print(str(e))
         return dict_list
@@ -214,7 +325,9 @@ class IndexData(HttpScraper):
         The leading columns ``DATE, TOTAL_TRADE, TOTAL_VOLUME, VALUE_MN,
         MARKET_CAP_MN`` are identical for both markets, followed by one column
         per index: ``DSEX, DSES, DS30, DGEN`` for DSE or
-        ``CASPI, CSE30, CSCX, CSE50, CSI`` for CSE. Rows are newest first.
+        ``CASPI, CSE30, CSCX, CSE50, CSI`` for CSE. DSE adds a trailing
+        ``EQUITY_MARKET_CAP_MN`` (equity-only market cap, None where the page
+        does not publish it). Rows are newest first.
 
         With no dates, returns the rolling ~30-day window. Pass ``start_date``
         and/or ``end_date`` (``date``/``datetime`` or any parseable string) to
@@ -227,7 +340,8 @@ class IndexData(HttpScraper):
                 columns=list(self._CSE_HISTORY_COLUMNS),
             )
         return pd.DataFrame(
-            self.parse_index_history_dse(start_date=start_date, end_date=end_date)
+            self.parse_index_history_dse(start_date=start_date, end_date=end_date),
+            columns=list(self._HISTORY_COLUMNS),
         )
 
     def save_index_history(self, file_path="", file_name="index_data.xlsx",

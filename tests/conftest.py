@@ -38,6 +38,11 @@ def index_history_soup():
 
 
 @pytest.fixture
+def index_history_rolling_soup():
+    return _load_soup("dse_index_history_rolling.html")
+
+
+@pytest.fixture
 def index_graph_text():
     return (FIXTURES / "dse_index_graph_cdset.html").read_text(encoding="utf-8")
 
