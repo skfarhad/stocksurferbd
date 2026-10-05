@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.2] - 2026-10-05
+
+### Fixed
+- **DSE day-wise index history no longer shifts columns.** On 2026-08-23 DSE
+  changed the rolling 30-day table (`recent_market_information.php`): the
+  market-cap heading now spans two sub-columns ("Equity Securities" and
+  "Total Market Cap.") under a two-row header, and the `DGEN` column is gone.
+  The row still had nine cells, so the positional parser silently returned the
+  equity market cap as `MARKET_CAP_MN`, the total market cap as `DSEX`, DSEX as
+  `DSES`, and so on. The dated archive (`recent_market_information_more.php`)
+  kept the old layout, so only undated calls were affected. `parse_index_history`
+  now flattens the header (honouring `colspan`/`rowspan`) and maps every cell by
+  header text; a body row whose cell count differs from the header is skipped,
+  and a header without `Date` and `DSEX` raises `ValueError`.
+
+### Added
+- `EQUITY_MARKET_CAP_MN` as a trailing column of the DSE `get_index_history_df`
+  / `save_index_history` output (equity-only market capitalisation, `None`
+  where the page does not publish it). Existing columns keep their names and
+  order.
+
 ## [2.1.1] - 2026-09-24
 
 ### Fixed

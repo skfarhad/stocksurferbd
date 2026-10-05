@@ -27,10 +27,110 @@ def test_parse_index_history(index_history_soup):
 
 def test_index_history_df_dtypes(index_history_soup):
     df = pd.DataFrame(IndexData.parse_index_history(index_history_soup))
-    assert df.shape == (30, 9)
+    assert df.shape == (30, 10)
     assert df["DSEX"].dtype == "float64"
     # DGEN is legacy and blank in recent rows -> all missing.
     assert df["DGEN"].isna().all()
+    # The archive layout has no equity-only market-cap column.
+    assert df["EQUITY_MARKET_CAP_MN"].isna().all()
+
+
+def test_parse_index_history_archive_layout_values(index_history_soup):
+    first = IndexData.parse_index_history(index_history_soup)[0]
+    assert first["DATE"] == datetime.date(2026, 6, 18)
+    assert first["VALUE_MN"] == 11972.115
+    assert first["MARKET_CAP_MN"] == 6934408.044
+    assert first["DSEX"] == 5661.38328
+    assert first["DSES"] == 1150.46627
+    assert first["DS30"] == 2143.12038
+
+
+def test_parse_index_history_rolling_two_row_header(index_history_rolling_soup):
+    # The rolling page splits "Market Capitalization" into "Equity Securities"
+    # and "Total Market Cap." sub-columns and drops DGEN. Mapping by header
+    # text must keep every value in its own field rather than shifting them.
+    records = IndexData.parse_index_history(index_history_rolling_soup)
+    assert len(records) == 30
+    first = records[0]
+    assert set(first) == set(IndexData._HISTORY_COLUMNS)
+    assert first["DATE"] == datetime.date(2026, 10, 4)
+    assert first["TOTAL_TRADE"] == 171907
+    assert first["TOTAL_VOLUME"] == 171228888
+    assert first["VALUE_MN"] == 5429.870
+    assert first["EQUITY_MARKET_CAP_MN"] == 3412584.582
+    assert first["MARKET_CAP_MN"] == 6781779.981
+    assert first["DSEX"] == 5482.36243
+    assert first["DSES"] == 1089.67508
+    assert first["DS30"] == 2085.29299
+    assert first["DGEN"] is None
+
+
+def test_parse_index_history_rolling_values_are_plausible(index_history_rolling_soup):
+    for record in IndexData.parse_index_history(index_history_rolling_soup):
+        assert 1000 < record["DSEX"] < 20000
+        assert record["DSES"] < record["DSEX"] < record["MARKET_CAP_MN"]
+
+
+def _history_table(header_html, body_html):
+    return BeautifulSoup(
+        f"<html><body><table>{header_html}{body_html}</table></body></html>",
+        "html.parser",
+    )
+
+
+def test_parse_index_history_columns_mapped_by_header_not_position():
+    soup = _history_table(
+        "<tr><th>DSEX Index</th><th>Date</th><th>Total Market Cap. in Taka (mn)</th>"
+        "<th>DS30 Index</th><th>Total Value in Taka (mn)</th></tr>",
+        "<tr><td>5482.36</td><td>04-10-2026</td><td>6781779.981</td>"
+        "<td>2085.29</td><td>5429.87</td></tr>",
+    )
+    record = IndexData.parse_index_history(soup)[0]
+    assert record["DSEX"] == 5482.36
+    assert record["DATE"] == datetime.date(2026, 10, 4)
+    assert record["MARKET_CAP_MN"] == 6781779.981
+    assert record["DS30"] == 2085.29
+    assert record["VALUE_MN"] == 5429.87
+    assert record["TOTAL_TRADE"] is None
+    assert record["DSES"] is None
+
+
+def test_parse_index_history_skips_rows_with_wrong_cell_count():
+    soup = _history_table(
+        "<tr><th>Date</th><th>DSEX Index</th></tr>",
+        "<tr><td>04-10-2026</td><td>5482.36</td></tr>"
+        "<tr><td>01-10-2026</td><td>5531.64</td><td>extra</td></tr>"
+        "<tr><td colspan='2'>Source: DSE</td></tr>",
+    )
+    records = IndexData.parse_index_history(soup)
+    assert [r["DSEX"] for r in records] == [5482.36]
+
+
+def test_history_column_positions_require_date_and_dsex():
+    header_rows = BeautifulSoup(
+        "<table><tr><th>Date</th><th>Total Trade</th><th>DSES Index</th></tr></table>",
+        "html.parser",
+    ).find_all("tr")
+    with pytest.raises(ValueError, match="DSEX"):
+        IndexData._history_column_positions(header_rows)
+
+
+def test_flatten_header_combines_colspan_and_rowspan_labels():
+    header_rows = BeautifulSoup(
+        "<table>"
+        "<tr><th rowspan='2'>Date</th>"
+        "<th colspan='2'>Market Capitalization in Taka (mn)</th>"
+        "<th rowspan='2'>DSEX Index</th></tr>"
+        "<tr><th>Equity Securities</th><th>Total Market Cap.</th></tr>"
+        "</table>",
+        "html.parser",
+    ).find_all("tr")
+    assert IndexData._flatten_header(header_rows) == [
+        "Date",
+        "Market Capitalization in Taka (mn) Equity Securities",
+        "Market Capitalization in Taka (mn) Total Market Cap.",
+        "DSEX Index",
+    ]
 
 
 def test_parse_index_history_missing_table():
